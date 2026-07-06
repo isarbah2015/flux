@@ -69,7 +69,7 @@ export default function SettingsScreen() {
   const { totalIndexed } = useScreenshots();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
+  const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -77,7 +77,36 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: botPad }}
         showsVerticalScrollIndicator={false}
       >
-        {/* App header */}
+
+        {/* ── Profile card ── */}
+        <SectionLabel title="PROFILE" />
+        <Pressable
+          style={({ pressed }) => [
+            styles.profileCard,
+            { backgroundColor: colors.card, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          {/* Avatar */}
+          <View style={[styles.avatar, { backgroundColor: colors.primary + '28' }]}>
+            <Feather name="user" size={26} color={colors.primary} />
+          </View>
+
+          {/* Info */}
+          <View style={styles.profileInfo}>
+            <Text style={[styles.profileName, { color: colors.foreground }]}>Flux User</Text>
+            <View style={[styles.planBadge, { backgroundColor: colors.secondary }]}>
+              <View style={[styles.planDot, { backgroundColor: '#30D158' }]} />
+              <Text style={[styles.planText, { color: colors.mutedForeground }]}>Free Plan</Text>
+            </View>
+          </View>
+
+          {/* Edit arrow */}
+          <View style={[styles.editBtn, { backgroundColor: colors.secondary }]}>
+            <Feather name="edit-2" size={14} color={colors.mutedForeground} />
+          </View>
+        </Pressable>
+
+        {/* ── App branding ── */}
         <View style={styles.appHeader}>
           <View style={[styles.appIcon, { backgroundColor: colors.primary + '20' }]}>
             <Feather name="zap" size={30} color={colors.primary} />
@@ -154,10 +183,11 @@ export default function SettingsScreen() {
         {/* About */}
         <SectionLabel title="ABOUT" />
         <Group>
-          <Row icon="info"         label="Version"         value="1.0.0" />
-          <Row icon="file-text"    label="Privacy Policy"  onPress={() => {}} />
-          <Row icon="message-square" label="Send Feedback" onPress={() => {}} last />
+          <Row icon="info"           label="Version"         value="1.0.0" />
+          <Row icon="file-text"      label="Privacy Policy"  onPress={() => {}} />
+          <Row icon="message-square" label="Send Feedback"   onPress={() => {}} last />
         </Group>
+
       </ScrollView>
     </View>
   );
@@ -165,7 +195,49 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  appHeader: { alignItems: 'center', paddingVertical: 24, gap: 8 },
+
+  // Profile
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 20,
+    marginBottom: 22,
+    padding: 16,
+    borderRadius: 20,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  profileInfo: { flex: 1, gap: 6 },
+  profileName: { fontSize: 17, fontFamily: 'DMSans_700Bold' },
+  planBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  planDot: { width: 6, height: 6, borderRadius: 3 },
+  planText: { fontSize: 12, fontFamily: 'DMSans_500Medium' },
+  editBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+
+  // App header
+  appHeader: { alignItems: 'center', paddingVertical: 20, gap: 8 },
   appIcon: {
     width: 76,
     height: 76,
@@ -176,6 +248,8 @@ const styles = StyleSheet.create({
   },
   appName: { fontSize: 26, fontFamily: 'DMSans_700Bold', letterSpacing: -0.5 },
   appTagline: { fontSize: 14, fontFamily: 'DMSans_400Regular' },
+
+  // Stats
   statsRow: {
     flexDirection: 'row',
     gap: 10,
@@ -191,6 +265,8 @@ const styles = StyleSheet.create({
   },
   statVal: { fontSize: 20, fontFamily: 'DMSans_700Bold' },
   statLbl: { fontSize: 11, fontFamily: 'DMSans_400Regular' },
+
+  // Section
   sectionLabel: {
     fontSize: 11,
     fontFamily: 'DMSans_600SemiBold',
@@ -217,6 +293,8 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 15, fontFamily: 'DMSans_400Regular' },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rowValue: { fontSize: 14, fontFamily: 'DMSans_400Regular' },
+
+  // Premium
   premiumCard: {
     marginHorizontal: 20,
     borderRadius: 20,

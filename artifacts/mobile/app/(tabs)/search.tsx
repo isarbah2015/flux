@@ -70,7 +70,7 @@ export default function SearchScreen() {
   const results = query.length > 0 ? searchScreenshots(query) : [];
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
+  const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

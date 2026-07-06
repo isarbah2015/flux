@@ -79,8 +79,8 @@ export default function OnboardingScreen() {
   }
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  // Must clear the floating tab bar pill (~66px) + its bottom offset + breathing room
-  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
+  // Onboarding has no tab bar, just clear the device edge
+  const botPad = Platform.OS === 'web' ? 40 : Math.max(insets.bottom, 16) + 16;
 
   const slide = SLIDES[page];
 

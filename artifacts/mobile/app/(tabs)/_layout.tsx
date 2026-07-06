@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useScreenshots } from '@/context/ScreenshotsContext';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
@@ -18,11 +19,17 @@ const TABS = [
 function FluxTabBar({ state, navigation }: { state: any; navigation: any; descriptors: any }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const bottom = Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 8);
+  const { hasOnboarded } = useScreenshots();
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // pointerEvents prop (not style) is required for native touch passthrough
+  // Sit just above safe-area edge — lower than before
+  const bottom = Platform.OS === 'web' ? 14 : Math.max(insets.bottom, 6);
+
+  // Hide completely during onboarding
+  if (!hasOnboarded) return null;
+
   return (
-    <View style={[styles.wrapper, { bottom: bottom + 12 }]} pointerEvents="box-none">
+    <View style={[styles.wrapper, { bottom: bottom + 6 }]} pointerEvents="box-none">
       {/* Glow halo behind the pill */}
       <View style={[styles.glow, { shadowColor: colors.primary }]} pointerEvents="none" />
 
@@ -31,6 +38,7 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
           <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
             {state.routes.map((route: any, index: number) => {
               const isFocused = state.index === index;
+              const isHovered = hoveredIndex === index;
               const tab = TABS[index];
 
               function onPress() {
@@ -49,23 +57,31 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
                 <Pressable
                   key={route.key}
                   onPress={onPress}
+                  onHoverIn={() => setHoveredIndex(index)}
+                  onHoverOut={() => setHoveredIndex(null)}
                   style={({ pressed }) => [
                     styles.tabBtn,
-                    isFocused && [styles.tabBtnActive, { backgroundColor: colors.primary + '2A' }],
-                    { transform: [{ scale: pressed ? 0.88 : 1 }], opacity: pressed ? 0.8 : 1 },
+                    // Active tab highlight
+                    isFocused && { backgroundColor: colors.primary + '28', borderRadius: 30 },
+                    // Hover highlight (web only, non-active tabs)
+                    !isFocused && isHovered && { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 30 },
+                    {
+                      transform: [{ scale: pressed ? 0.86 : isHovered && !isFocused ? 1.06 : 1 }],
+                      opacity: pressed ? 0.75 : 1,
+                    },
                   ]}
                 >
                   {Platform.OS === 'ios' ? (
                     <SymbolView
                       name={tab.sf as any}
-                      tintColor={isFocused ? colors.primary : colors.mutedForeground}
+                      tintColor={isFocused ? colors.primary : isHovered ? colors.foreground : colors.mutedForeground}
                       size={21}
                     />
                   ) : (
                     <Feather
                       name={tab.icon}
                       size={20}
-                      color={isFocused ? colors.primary : colors.mutedForeground}
+                      color={isFocused ? colors.primary : isHovered ? colors.foreground : colors.mutedForeground}
                     />
                   )}
                   {isFocused && (
@@ -132,7 +148,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 10, 22, 0.82)',
     borderRadius: 44,
     borderWidth: 1,
-    gap: 6,
+    gap: 4,
   },
   tabBtn: {
     width: 58,
@@ -141,8 +157,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-  },
-  tabBtnActive: {},
+    transitionDuration: '150ms',
+  } as any,
   activeDot: {
     width: 4,
     height: 4,

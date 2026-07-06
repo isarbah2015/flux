@@ -29,7 +29,7 @@ export default function LibraryScreen() {
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   // Clear the floating pill (66px) + its bottom margin + breathing room
-  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
+  const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
 
   type GridRow = { left: Screenshot; right: Screenshot | null } | '__empty__';
 

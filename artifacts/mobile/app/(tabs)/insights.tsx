@@ -38,7 +38,7 @@ export default function InsightsScreen() {
   const groups = groupInsights(insights);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
+  const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
 
   type ListItem =
     | { kind: 'header'; type: string }
