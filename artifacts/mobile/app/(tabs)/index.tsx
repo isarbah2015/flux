@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_600SemiBold',
   },
   pillsScroll: { flexGrow: 0, marginBottom: 6 },
-  pillsRow: { paddingHorizontal: 20, paddingVertical: 4 },
+  pillsRow: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 4 },
   grid: { paddingHorizontal: 6, paddingTop: 4 },
   row: { flexDirection: 'row' },
   emptyCell: { flex: 1, margin: 6 },
