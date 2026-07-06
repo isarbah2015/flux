@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useScreenshots } from '@/context/ScreenshotsContext';
@@ -16,21 +16,98 @@ const TABS = [
   { name: 'settings', icon: 'settings' as const, sf: 'gearshape.fill'        },
 ];
 
+/** One animated tab button — handles hover + press independently */
+function TabButton({
+  route,
+  index,
+  isFocused,
+  colors,
+  onPress,
+}: {
+  route: any;
+  index: number;
+  isFocused: boolean;
+  colors: any;
+  onPress: () => void;
+}) {
+  const tab = TABS[index];
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim  = useRef(new Animated.Value(0)).current;
+
+  function animateIn() {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1.13, useNativeDriver: true, speed: 40, bounciness: 6 }),
+      Animated.timing(glowAnim,  { toValue: 1,    useNativeDriver: false, duration: 120 }),
+    ]).start();
+  }
+
+  function animateOut() {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 4 }),
+      Animated.timing(glowAnim,  { toValue: 0, useNativeDriver: false, duration: 150 }),
+    ]).start();
+  }
+
+  function animatePress() {
+    Animated.sequence([
+      Animated.spring(scaleAnim, { toValue: 0.84, useNativeDriver: true, speed: 60, bounciness: 0 }),
+      Animated.spring(scaleAnim, { toValue: 1,    useNativeDriver: true, speed: 30, bounciness: 8 }),
+    ]).start();
+  }
+
+  // Interpolate hover glow background opacity
+  const hoverBg = glowAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [
+      isFocused ? colors.primary + '28' : 'rgba(255,255,255,0)',
+      isFocused ? colors.primary + '45' : 'rgba(255,255,255,0.14)',
+    ],
+  });
+
+  const iconColor = isFocused ? colors.primary : colors.mutedForeground;
+
+  return (
+    <Pressable
+      key={route.key}
+      onPress={() => { animatePress(); onPress(); }}
+      onHoverIn={() => { if (Platform.OS === 'web') animateIn(); }}
+      onHoverOut={() => { if (Platform.OS === 'web') animateOut(); }}
+      style={styles.tabBtn}
+    >
+      <Animated.View
+        style={[
+          styles.tabBtnInner,
+          { backgroundColor: hoverBg, transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        {Platform.OS === 'ios' ? (
+          <SymbolView
+            name={tab.sf as any}
+            tintColor={iconColor}
+            size={21}
+          />
+        ) : (
+          <Feather name={tab.icon} size={20} color={iconColor} />
+        )}
+        {isFocused && (
+          <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 function FluxTabBar({ state, navigation }: { state: any; navigation: any; descriptors: any }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { hasOnboarded } = useScreenshots();
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Sit just above safe-area edge — lower than before
   const bottom = Platform.OS === 'web' ? 14 : Math.max(insets.bottom, 6);
 
-  // Hide completely during onboarding
   if (!hasOnboarded) return null;
 
   return (
     <View style={[styles.wrapper, { bottom: bottom + 6 }]} pointerEvents="box-none">
-      {/* Glow halo behind the pill */}
       <View style={[styles.glow, { shadowColor: colors.primary }]} pointerEvents="none" />
 
       <View style={styles.pillShadow}>
@@ -38,8 +115,6 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
           <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
             {state.routes.map((route: any, index: number) => {
               const isFocused = state.index === index;
-              const isHovered = hoveredIndex === index;
-              const tab = TABS[index];
 
               function onPress() {
                 Haptics.selectionAsync();
@@ -54,40 +129,14 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
               }
 
               return (
-                <Pressable
+                <TabButton
                   key={route.key}
+                  route={route}
+                  index={index}
+                  isFocused={isFocused}
+                  colors={colors}
                   onPress={onPress}
-                  onHoverIn={() => setHoveredIndex(index)}
-                  onHoverOut={() => setHoveredIndex(null)}
-                  style={({ pressed }) => [
-                    styles.tabBtn,
-                    // Active tab highlight
-                    isFocused && { backgroundColor: colors.primary + '28', borderRadius: 30 },
-                    // Hover highlight (web only, non-active tabs)
-                    !isFocused && isHovered && { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 30 },
-                    {
-                      transform: [{ scale: pressed ? 0.86 : isHovered && !isFocused ? 1.06 : 1 }],
-                      opacity: pressed ? 0.75 : 1,
-                    },
-                  ]}
-                >
-                  {Platform.OS === 'ios' ? (
-                    <SymbolView
-                      name={tab.sf as any}
-                      tintColor={isFocused ? colors.primary : isHovered ? colors.foreground : colors.mutedForeground}
-                      size={21}
-                    />
-                  ) : (
-                    <Feather
-                      name={tab.icon}
-                      size={20}
-                      color={isFocused ? colors.primary : isHovered ? colors.foreground : colors.mutedForeground}
-                    />
-                  )}
-                  {isFocused && (
-                    <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
-                  )}
-                </Pressable>
+                />
               );
             })}
           </View>
@@ -150,15 +199,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 4,
   },
+  // Outer touchable — sized for hit area
   tabBtn: {
+    width: 58,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Inner animated view — sized the same, renders the visual
+  tabBtnInner: {
     width: 58,
     height: 50,
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    transitionDuration: '150ms',
-  } as any,
+  },
   activeDot: {
     width: 4,
     height: 4,
