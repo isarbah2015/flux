@@ -1,36 +1,55 @@
-# [Project name]
+# Flux (ScreenshotOS)
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A mobile-first AI screenshot intelligence engine. Flux automatically processes screenshots, extracts actionable data, and surfaces it when needed — without the user ever opening the app.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port from `$PORT`, typically 8080)
+- `pnpm --filter @workspace/mobile run dev` — run the Expo mobile app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/db run push` — push DB schema changes to dev database (dev only)
+
+## Required Environment
+
+- `DATABASE_URL` — Postgres connection string (auto-provided by Replit's built-in PostgreSQL; also available as `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`)
+- `PORT` — injected automatically by Replit workflows; hard-required at API startup
+- `SESSION_SECRET` — secret for session signing (set in Replit Secrets)
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
+- Mobile: Expo 54 / React Native 0.81 (expo-router)
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
+- API codegen: Orval (from OpenAPI spec in `lib/api-spec/`)
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/mobile/` — Expo React Native mobile app
+- `artifacts/api-server/` — Express 5 API server
+- `artifacts/mockup-sandbox/` — UI component sandbox (design tool)
+- `lib/db/` — Drizzle ORM schema + DB client (source of truth for schema)
+- `lib/api-spec/` — OpenAPI spec (source of truth for API contract)
+- `lib/api-zod/` — generated Zod schemas from OpenAPI spec
+- `lib/api-client-react/` — generated React Query hooks from OpenAPI spec
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- API contract is defined in `lib/api-spec/openapi.yaml`; client hooks and Zod schemas are generated via `pnpm --filter @workspace/api-spec run codegen`. Do not hand-edit generated files in `lib/api-zod/` or `lib/api-client-react/`.
+- `@types/react` is pinned to a single version via `pnpm.overrides` in `package.json` to prevent the dual-path type resolution error that arises from expo packages using `19.1.x` while the mockup-sandbox catalog uses `^19.2.0`.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Flux turns your screenshot library into a searchable, intelligent action engine. Core concept: users already take screenshots — Flux makes those screenshots alive by classifying them, extracting structured data, and surfacing reminders and alerts without any extra effort.
+
+Planned feature tiers:
+- **Free**: Basic OCR, searchable screenshot library, tag filtering
+- **Premium** ($9.99/mo): Price tracking, calendar sync, promise reminders, unlimited classification
+- **Enterprise** ($49/user/mo): Team dashboard, auto-redaction, compliance logging
 
 ## User preferences
 
@@ -38,7 +57,8 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- After any `pnpm install`, restart the `artifacts/mobile: expo` workflow — react-native-reanimated creates a tmp watch directory that gets invalidated and crashes Metro on the first run after package changes.
+- `@types/react` override in `package.json > pnpm.overrides` must stay at a single version; removing it causes dual-path TS errors in `mockup-sandbox`.
 
 ## Pointers
 

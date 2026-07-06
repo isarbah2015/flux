@@ -1,0 +1,2 @@
+- [Types/React dual-path fix](types-react-override.md) — pnpm.overrides pins @types/react to avoid dual-path TS errors between expo (19.1.x) and mockup-sandbox (19.2.x)
+- [Post-install mobile restart](post-install-mobile.md) — after pnpm install, restart expo workflow; reanimated tmp dir is invalidated and crashes Metro otherwise
