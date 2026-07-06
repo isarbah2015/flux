@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     bottom: 8,
     right: 10,
     fontSize: 10,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'DMSans_500Medium',
   },
   content: {
     padding: 12,
@@ -123,12 +123,12 @@ const styles = StyleSheet.create({
   },
   category: {
     fontSize: 9,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'DMSans_700Bold',
     letterSpacing: 1.2,
   },
   summary: {
     fontSize: 12,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'DMSans_500Medium',
     lineHeight: 17,
   },
 });

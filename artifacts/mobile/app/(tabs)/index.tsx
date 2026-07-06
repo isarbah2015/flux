@@ -128,12 +128,12 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontSize: 30,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'DMSans_700Bold',
     letterSpacing: -1,
   },
   subtitle: {
     fontSize: 13,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'DMSans_400Regular',
     marginTop: 2,
   },
   processingPill: {
@@ -146,11 +146,11 @@ const styles = StyleSheet.create({
   },
   processingText: {
     fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'DMSans_600SemiBold',
   },
   pillsScroll: { flexGrow: 0, marginBottom: 6 },
-  pillsRow: { paddingHorizontal: 18, paddingVertical: 4 },
-  grid: { paddingHorizontal: 10, paddingTop: 4 },
+  pillsRow: { paddingHorizontal: 20, paddingVertical: 4 },
+  grid: { paddingHorizontal: 6, paddingTop: 4 },
   row: { flexDirection: 'row' },
   emptyCell: { flex: 1, margin: 6 },
   emptyState: {
@@ -161,11 +161,11 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'DMSans_600SemiBold',
   },
   emptySub: {
     fontSize: 14,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'DMSans_400Regular',
     textAlign: 'center',
     maxWidth: 240,
   },

@@ -105,8 +105,8 @@ export default function InsightsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 22, paddingBottom: 16, gap: 3 },
-  title: { fontSize: 30, fontFamily: 'Inter_700Bold', letterSpacing: -1 },
-  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  title: { fontSize: 30, fontFamily: 'DMSans_700Bold', letterSpacing: -1 },
+  subtitle: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'DMSans_600SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyTitle: { fontSize: 20, fontFamily: 'Inter_700Bold' },
+  emptyTitle: { fontSize: 20, fontFamily: 'DMSans_700Bold' },
   emptySub: {
     fontSize: 15,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'DMSans_400Regular',
     textAlign: 'center',
     lineHeight: 22,
   },

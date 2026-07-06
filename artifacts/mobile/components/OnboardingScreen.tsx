@@ -79,7 +79,8 @@ export default function OnboardingScreen() {
   }
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
+  // Must clear the floating tab bar pill (~66px) + its bottom offset + breathing room
+  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
 
   const slide = SLIDES[page];
 
@@ -132,7 +133,7 @@ export default function OnboardingScreen() {
       </View>
 
       {/* Button */}
-      <View style={[styles.footer, { paddingBottom: botPad + 24 }]}>
+      <View style={[styles.footer, { paddingBottom: botPad }]}>
         <Pressable
           onPress={goNext}
           style={({ pressed }) => [
@@ -178,14 +179,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 40,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'DMSans_700Bold',
     textAlign: 'center',
     lineHeight: 46,
     letterSpacing: -1,
   },
   subtitle: {
     fontSize: 16,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'DMSans_400Regular',
     textAlign: 'center',
     lineHeight: 24,
     maxWidth: 320,
@@ -218,10 +219,10 @@ const styles = StyleSheet.create({
   btnText: {
     color: '#fff',
     fontSize: 17,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'DMSans_700Bold',
   },
   privacyNote: {
     fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'DMSans_400Regular',
   },
 });

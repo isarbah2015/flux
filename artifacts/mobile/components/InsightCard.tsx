@@ -102,12 +102,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'DMSans_600SemiBold',
     lineHeight: 20,
   },
   subtitle: {
     fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'DMSans_400Regular',
     lineHeight: 17,
   },
   chip: {
@@ -118,6 +118,6 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 11,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'DMSans_700Bold',
   },
 });
