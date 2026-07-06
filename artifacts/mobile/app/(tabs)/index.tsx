@@ -87,21 +87,22 @@ export default function LibraryScreen() {
         )}
       </View>
 
-      {/* Category pills */}
+      {/* Category pills — inner View carries the padding so left edge isn't clipped on web */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.pillsRow}
         style={styles.pillsScroll}
       >
-        {CATEGORIES.map((cat) => (
-          <CategoryPill
-            key={cat}
-            value={cat}
-            active={activeCategory === cat}
-            onPress={() => setActiveCategory(cat)}
-          />
-        ))}
+        <View style={styles.pillsRow}>
+          {CATEGORIES.map((cat) => (
+            <CategoryPill
+              key={cat}
+              value={cat}
+              active={activeCategory === cat}
+              onPress={() => setActiveCategory(cat)}
+            />
+          ))}
+        </View>
       </ScrollView>
 
       {/* Grid */}

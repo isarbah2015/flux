@@ -23,10 +23,8 @@ export default function CategoryPill({ value, active, onPress }: Props) {
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={({ pressed }) => [
         styles.pill,
-        {
-          backgroundColor: active ? catColor : colors.secondary,
-          transform: [{ scale: pressed ? 0.93 : 1 }],
-        },
+        { backgroundColor: active ? catColor : colors.secondary },
+        pressed && { transform: [{ scale: 0.93 }] },
       ]}
     >
       <Text style={[styles.label, { color: active ? '#fff' : colors.mutedForeground }]}>
