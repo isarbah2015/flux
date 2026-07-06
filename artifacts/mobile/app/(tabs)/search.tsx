@@ -16,54 +16,51 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
-function highlight(text: string, query: string): string {
-  return text;
-}
+const RECENT_SEARCHES = ['flight', 'nike', 'receipt', 'promise', 'meeting'];
 
 function ResultRow({ item, query }: { item: Screenshot; query: string }) {
   const colors = useColors();
   const catColor = CATEGORY_COLORS[item.category] ?? '#636384';
-  const catLabel = CATEGORY_LABELS[item.category] ?? 'Other';
   const icon = CATEGORY_ICONS[item.category] ?? 'image';
+  const catLabel = CATEGORY_LABELS[item.category];
 
-  // Find the matching snippet
   const q = query.toLowerCase();
   const idx = item.extractedText.toLowerCase().indexOf(q);
   let snippet = item.summary;
   if (idx !== -1) {
-    const start = Math.max(0, idx - 30);
-    const end = Math.min(item.extractedText.length, idx + query.length + 60);
-    snippet = (start > 0 ? '…' : '') + item.extractedText.slice(start, end) + (end < item.extractedText.length ? '…' : '');
+    const start = Math.max(0, idx - 28);
+    const end = Math.min(item.extractedText.length, idx + query.length + 55);
+    snippet =
+      (start > 0 ? '…' : '') +
+      item.extractedText.slice(start, end) +
+      (end < item.extractedText.length ? '…' : '');
   }
 
   return (
     <Pressable
       onPress={() => { Haptics.selectionAsync(); router.push(`/screenshot/${item.id}`); }}
       style={({ pressed }) => [
-        styles.resultRow,
-        { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+        styles.result,
+        {
+          backgroundColor: catColor + '0C',
+          shadowColor: catColor,
+          transform: [{ scale: pressed ? 0.97 : 1 }],
+        },
       ]}
     >
-      <View style={[styles.resultIcon, { backgroundColor: catColor + '22' }]}>
+      <View style={[styles.resultIcon, { backgroundColor: catColor + '25' }]}>
         <Feather name={icon as any} size={18} color={catColor} />
       </View>
-      <View style={styles.resultContent}>
-        <View style={styles.resultHeader}>
-          <Text style={[styles.catLabel, { color: catColor }]}>{catLabel}</Text>
-          <Text style={[styles.resultTime, { color: colors.mutedForeground }]}>
-            {new Date(item.capturedAt).toLocaleDateString()}
-          </Text>
-        </View>
+      <View style={styles.resultText}>
+        <Text style={[styles.resultCat, { color: catColor }]}>{catLabel.toUpperCase()}</Text>
         <Text style={[styles.snippet, { color: colors.foreground }]} numberOfLines={2}>
           {snippet}
         </Text>
       </View>
-      <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
     </Pressable>
   );
 }
-
-const RECENT_SEARCHES = ['flight', 'nike', 'receipt', 'promise', 'meeting'];
 
 export default function SearchScreen() {
   const colors = useColors();
@@ -73,24 +70,23 @@ export default function SearchScreen() {
   const results = query.length > 0 ? searchScreenshots(query) : [];
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 60;
+  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12 }]}>
+      <View style={[styles.header, { paddingTop: topPad + 16 }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Search</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Every word in every screenshot
+          Every word, every screenshot
         </Text>
       </View>
 
-      {/* Search bar */}
-      <View style={[styles.searchBar, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-        <Feather name="search" size={18} color={colors.mutedForeground} />
+      {/* Search bar — no border, just a filled surface */}
+      <View style={[styles.searchWrap, { backgroundColor: colors.secondary }]}>
+        <Feather name="search" size={17} color={colors.mutedForeground} />
         <TextInput
-          style={[styles.searchInput, { color: colors.foreground }]}
-          placeholder="Search screenshots…"
+          style={[styles.input, { color: colors.foreground }]}
+          placeholder="Type anything…"
           placeholderTextColor={colors.mutedForeground}
           value={query}
           onChangeText={setQuery}
@@ -99,23 +95,25 @@ export default function SearchScreen() {
         />
         {query.length > 0 && Platform.OS !== 'ios' && (
           <Pressable onPress={() => setQuery('')}>
-            <Feather name="x" size={16} color={colors.mutedForeground} />
+            <Feather name="x-circle" size={16} color={colors.mutedForeground} />
           </Pressable>
         )}
       </View>
 
       {query.length === 0 ? (
-        /* Recent searches */
-        <View style={styles.recentWrap}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Recent Searches</Text>
-          <View style={styles.recentPills}>
+        <View style={styles.recentSection}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Recent</Text>
+          <View style={styles.recentRow}>
             {RECENT_SEARCHES.map((s) => (
               <Pressable
                 key={s}
                 onPress={() => setQuery(s)}
-                style={[styles.recentPill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                style={({ pressed }) => [
+                  styles.recentPill,
+                  { backgroundColor: colors.secondary, opacity: pressed ? 0.7 : 1 },
+                ]}
               >
-                <Feather name="clock" size={12} color={colors.mutedForeground} />
+                <Feather name="clock" size={11} color={colors.mutedForeground} />
                 <Text style={[styles.recentText, { color: colors.foreground }]}>{s}</Text>
               </Pressable>
             ))}
@@ -123,10 +121,12 @@ export default function SearchScreen() {
         </View>
       ) : results.length === 0 ? (
         <View style={styles.noResults}>
-          <Feather name="search" size={36} color={colors.mutedForeground} />
-          <Text style={[styles.noResultsTitle, { color: colors.foreground }]}>No results</Text>
+          <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+            <Feather name="search" size={28} color={colors.mutedForeground} />
+          </View>
+          <Text style={[styles.noResultsTitle, { color: colors.foreground }]}>No matches</Text>
           <Text style={[styles.noResultsSub, { color: colors.mutedForeground }]}>
-            No screenshots contain "{query}"
+            Nothing found for "{query}"
           </Text>
         </View>
       ) : (
@@ -137,7 +137,7 @@ export default function SearchScreen() {
           contentContainerStyle={[styles.list, { paddingBottom: botPad }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <Text style={[styles.resultsCount, { color: colors.mutedForeground }]}>
+            <Text style={[styles.count, { color: colors.mutedForeground }]}>
               {results.length} result{results.length !== 1 ? 's' : ''}
             </Text>
           }
@@ -149,123 +149,57 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 4,
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
-  searchBar: {
+  header: { paddingHorizontal: 22, paddingBottom: 16, gap: 3 },
+  title: { fontSize: 30, fontFamily: 'Inter_700Bold', letterSpacing: -1 },
+  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
+    marginHorizontal: 20,
+    marginBottom: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
-  },
-  recentWrap: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
+  input: { flex: 1, fontSize: 16, fontFamily: 'Inter_400Regular' },
+  recentSection: { paddingHorizontal: 22, gap: 12 },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
-  recentPills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  recentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   recentPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     borderRadius: 20,
-    borderWidth: 1,
   },
-  recentText: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-  },
-  noResults: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  noResultsTitle: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  noResultsSub: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
-  list: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    gap: 8,
-  },
-  resultsCount: {
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    marginBottom: 8,
-  },
-  resultRow: {
+  recentText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  noResults: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  emptyIcon: { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  noResultsTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  noResultsSub: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  list: { paddingHorizontal: 20, paddingTop: 4, gap: 8 },
+  count: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8 },
+  result: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 18,
     marginBottom: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  resultIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resultContent: { flex: 1, gap: 3 },
-  resultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  catLabel: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  resultTime: {
-    fontSize: 11,
-    fontFamily: 'Inter_400Regular',
-  },
-  snippet: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 18,
-  },
+  resultIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  resultText: { flex: 1, gap: 3 },
+  resultCat: { fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 1.2 },
+  snippet: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 });

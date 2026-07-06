@@ -32,38 +32,37 @@ export default function InsightCard({ insight }: Props) {
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: colors.card,
-          borderColor: insight.urgent ? insight.colorHex + '55' : colors.border,
-          opacity: pressed ? 0.85 : 1,
+          backgroundColor: insight.colorHex + '0E',
+          shadowColor: insight.urgent ? insight.colorHex : '#000',
+          transform: [{ scale: pressed ? 0.97 : 1 }],
         },
       ]}
     >
-      {/* Left accent */}
-      <View style={[styles.accentBar, { backgroundColor: insight.colorHex }]} />
+      {/* Urgency glow strip at top */}
+      {insight.urgent && (
+        <View style={[styles.urgencyStrip, { backgroundColor: insight.colorHex }]} />
+      )}
 
-      {/* Icon */}
-      <View style={[styles.iconWrap, { backgroundColor: insight.colorHex + '22' }]}>
-        <Feather name={icon as any} size={18} color={insight.colorHex} />
-      </View>
+      <View style={styles.inner}>
+        {/* Icon */}
+        <View style={[styles.iconWrap, { backgroundColor: insight.colorHex + '25' }]}>
+          <Feather name={icon as any} size={20} color={insight.colorHex} />
+        </View>
 
-      {/* Text */}
-      <View style={styles.content}>
-        <View style={styles.titleRow}>
+        {/* Text */}
+        <View style={styles.textBlock}>
           <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>
             {insight.title}
           </Text>
-          {insight.urgent && (
-            <View style={[styles.urgentDot, { backgroundColor: insight.colorHex }]} />
-          )}
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]} numberOfLines={2}>
+            {insight.subtitle}
+          </Text>
         </View>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]} numberOfLines={2}>
-          {insight.subtitle}
-        </Text>
-      </View>
 
-      {/* Action */}
-      <View style={[styles.actionBadge, { backgroundColor: insight.colorHex + '22' }]}>
-        <Text style={[styles.actionText, { color: insight.colorHex }]}>{insight.actionLabel}</Text>
+        {/* Action chip */}
+        <View style={[styles.chip, { backgroundColor: insight.colorHex + '22' }]}>
+          <Text style={[styles.chipText, { color: insight.colorHex }]}>{insight.actionLabel}</Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -71,58 +70,53 @@ export default function InsightCard({ insight }: Props) {
 
 const styles = StyleSheet.create({
   card: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  urgencyStrip: {
+    height: 3,
+  },
+  inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
-    paddingRight: 12,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  accentBar: {
-    width: 4,
-    alignSelf: 'stretch',
+    padding: 16,
+    gap: 14,
   },
   iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  content: {
+  textBlock: {
     flex: 1,
     gap: 3,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   title: {
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
-    flex: 1,
-  },
-  urgentDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    lineHeight: 20,
   },
   subtitle: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     lineHeight: 17,
   },
-  actionBadge: {
+  chip: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 20,
+    flexShrink: 0,
   },
-  actionText: {
+  chipText: {
     fontSize: 11,
     fontFamily: 'Inter_700Bold',
   },

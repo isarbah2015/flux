@@ -19,9 +19,10 @@ interface RowProps {
   value?: string;
   onPress?: () => void;
   destructive?: boolean;
+  last?: boolean;
 }
 
-function SettingsRow({ icon, iconColor, label, value, onPress, destructive }: RowProps) {
+function Row({ icon, iconColor, label, value, onPress, destructive, last }: RowProps) {
   const colors = useColors();
   const ic = iconColor ?? colors.mutedForeground;
   return (
@@ -30,34 +31,35 @@ function SettingsRow({ icon, iconColor, label, value, onPress, destructive }: Ro
       disabled={!onPress}
       style={({ pressed }) => [
         styles.row,
-        { borderColor: colors.border, opacity: pressed ? 0.75 : 1 },
+        !last && { borderBottomWidth: 1, borderBottomColor: colors.border + '55' },
+        { opacity: pressed ? 0.7 : 1 },
       ]}
     >
-      <View style={[styles.rowIcon, { backgroundColor: ic + '22' }]}>
-        <Feather name={icon as any} size={16} color={ic} />
+      <View style={[styles.rowIcon, { backgroundColor: ic + '20' }]}>
+        <Feather name={icon as any} size={15} color={ic} />
       </View>
-      <Text
-        style={[
-          styles.rowLabel,
-          { color: destructive ? colors.destructive : colors.foreground },
-        ]}
-      >
+      <Text style={[styles.rowLabel, { color: destructive ? colors.destructive : colors.foreground }]}>
         {label}
       </Text>
       <View style={styles.rowRight}>
-        {value && (
-          <Text style={[styles.rowValue, { color: colors.mutedForeground }]}>{value}</Text>
-        )}
-        {onPress && <Feather name="chevron-right" size={16} color={colors.mutedForeground} />}
+        {value && <Text style={[styles.rowValue, { color: colors.mutedForeground }]}>{value}</Text>}
+        {onPress && <Feather name="chevron-right" size={15} color={colors.mutedForeground} />}
       </View>
     </Pressable>
   );
 }
 
-function SectionHeader({ title }: { title: string }) {
+function SectionLabel({ title }: { title: string }) {
+  const colors = useColors();
+  return <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>{title}</Text>;
+}
+
+function Group({ children }: { children: React.ReactNode }) {
   const colors = useColors();
   return (
-    <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>{title}</Text>
+    <View style={[styles.group, { backgroundColor: colors.card }]}>
+      {children}
+    </View>
   );
 }
 
@@ -67,94 +69,74 @@ export default function SettingsScreen() {
   const { totalIndexed } = useScreenshots();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 60;
+  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: topPad + 12, paddingBottom: botPad }]}
+        contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: botPad }}
         showsVerticalScrollIndicator={false}
       >
-        {/* App identity */}
+        {/* App header */}
         <View style={styles.appHeader}>
-          <View style={[styles.appIcon, { backgroundColor: colors.primary + '22' }]}>
-            <Feather name="zap" size={28} color={colors.primary} />
+          <View style={[styles.appIcon, { backgroundColor: colors.primary + '20' }]}>
+            <Feather name="zap" size={30} color={colors.primary} />
           </View>
           <Text style={[styles.appName, { color: colors.foreground }]}>Flux</Text>
           <Text style={[styles.appTagline, { color: colors.mutedForeground }]}>
             Your screenshots, alive.
           </Text>
-          <View style={[styles.statsRow]}>
-            <View style={[styles.statPill, { backgroundColor: colors.primary + '18' }]}>
-              <Text style={[styles.statNum, { color: colors.primary }]}>{totalIndexed}</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Indexed</Text>
+        </View>
+
+        {/* Stats row */}
+        <View style={styles.statsRow}>
+          {[
+            { val: String(totalIndexed), lbl: 'Indexed',    color: colors.primary  },
+            { val: '100%',              lbl: 'On-device',   color: '#30D158'       },
+            { val: '0',                 lbl: 'Cloud calls', color: '#FF9F0A'       },
+          ].map(({ val, lbl, color }) => (
+            <View key={lbl} style={[styles.statCard, { backgroundColor: color + '14' }]}>
+              <Text style={[styles.statVal, { color }]}>{val}</Text>
+              <Text style={[styles.statLbl, { color: colors.mutedForeground }]}>{lbl}</Text>
             </View>
-            <View style={[styles.statPill, { backgroundColor: '#30D158' + '18' }]}>
-              <Text style={[styles.statNum, { color: '#30D158' }]}>100%</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>On-device</Text>
-            </View>
-            <View style={[styles.statPill, { backgroundColor: '#FF9F0A' + '18' }]}>
-              <Text style={[styles.statNum, { color: '#FF9F0A' }]}>0</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Cloud calls</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
         {/* Privacy */}
-        <SectionHeader title="PRIVACY" />
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <SettingsRow
-            icon="shield"
-            iconColor="#30D158"
-            label="On-device processing"
-            value="Always on"
-          />
-          <SettingsRow
-            icon="cloud-off"
-            iconColor="#30D158"
-            label="Cloud sync"
-            value="Disabled"
-          />
-          <SettingsRow
-            icon="eye-off"
-            iconColor="#30D158"
-            label="Analytics"
-            value="Disabled"
-          />
-        </View>
+        <SectionLabel title="PRIVACY" />
+        <Group>
+          <Row icon="shield"    iconColor="#30D158" label="On-device processing" value="Always on" />
+          <Row icon="cloud-off" iconColor="#30D158" label="Cloud sync"           value="Disabled"  />
+          <Row icon="eye-off"   iconColor="#30D158" label="Analytics"            value="Disabled"  last />
+        </Group>
 
         {/* Storage */}
-        <SectionHeader title="STORAGE" />
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <SettingsRow
-            icon="database"
-            iconColor={colors.primary}
-            label="Screenshots indexed"
-            value={String(totalIndexed)}
-          />
-          <SettingsRow
-            icon="hard-drive"
-            iconColor={colors.primary}
-            label="Local storage used"
-            value="4.2 MB"
-          />
-        </View>
+        <SectionLabel title="STORAGE" />
+        <Group>
+          <Row icon="database"   iconColor={colors.primary} label="Indexed screenshots" value={String(totalIndexed)} />
+          <Row icon="hard-drive" iconColor={colors.primary} label="Local storage"       value="4.2 MB" last />
+        </Group>
 
         {/* Premium */}
-        <SectionHeader title="PREMIUM" />
-        <View style={[styles.premiumCard, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '44' }]}>
-          <View style={styles.premiumHeader}>
-            <Feather name="star" size={18} color={colors.primary} />
-            <Text style={[styles.premiumTitle, { color: colors.primary }]}>Upgrade to Premium</Text>
+        <SectionLabel title="PREMIUM" />
+        <View style={[styles.premiumCard, { backgroundColor: colors.primary + '12' }]}>
+          <View style={styles.premiumTop}>
+            <View style={[styles.premiumIcon, { backgroundColor: colors.primary + '22' }]}>
+              <Feather name="star" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.premiumTitle, { color: colors.foreground }]}>Flux Premium</Text>
+              <Text style={[styles.premiumPrice, { color: colors.primary }]}>$9.99 / month</Text>
+            </View>
           </View>
-          <Text style={[styles.premiumSub, { color: colors.mutedForeground }]}>
+          <Text style={[styles.premiumDesc, { color: colors.mutedForeground }]}>
             Price tracking, promise reminders, calendar sync, and unlimited AI classification.
           </Text>
-          <View style={styles.premiumFeatures}>
-            {['Price drop alerts', 'Promise tracker', 'Calendar sync', 'Unlimited OCR'].map((f) => (
-              <View key={f} style={styles.premiumFeature}>
-                <Feather name="check" size={13} color={colors.primary} />
-                <Text style={[styles.premiumFeatureText, { color: colors.foreground }]}>{f}</Text>
+          <View style={styles.featureGrid}>
+            {['Price drops', 'Promise tracker', 'Calendar sync', 'Unlimited OCR'].map((f) => (
+              <View key={f} style={styles.featureRow}>
+                <View style={[styles.checkDot, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.featureText, { color: colors.foreground }]}>{f}</Text>
               </View>
             ))}
           </View>
@@ -164,17 +146,18 @@ export default function SettingsScreen() {
               { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
             ]}
           >
-            <Text style={styles.premiumBtnText}>$9.99 / month — Start Free Trial</Text>
+            <Text style={styles.premiumBtnText}>Start Free Trial</Text>
+            <Feather name="arrow-right" size={16} color="#fff" />
           </Pressable>
         </View>
 
         {/* About */}
-        <SectionHeader title="ABOUT" />
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <SettingsRow icon="info" label="Version" value="1.0.0" />
-          <SettingsRow icon="file-text" label="Privacy Policy" onPress={() => {}} />
-          <SettingsRow icon="message-square" label="Send Feedback" onPress={() => {}} />
-        </View>
+        <SectionLabel title="ABOUT" />
+        <Group>
+          <Row icon="info"         label="Version"         value="1.0.0" />
+          <Row icon="file-text"    label="Privacy Policy"  onPress={() => {}} />
+          <Row icon="message-square" label="Send Feedback" onPress={() => {}} last />
+        </Group>
       </ScrollView>
     </View>
   );
@@ -182,136 +165,82 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: {
-    paddingHorizontal: 16,
-    gap: 0,
-  },
-  appHeader: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    gap: 8,
-  },
+  appHeader: { alignItems: 'center', paddingVertical: 24, gap: 8 },
   appIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
+    width: 76,
+    height: 76,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
-  appName: {
-    fontSize: 26,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: -0.5,
-  },
-  appTagline: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
+  appName: { fontSize: 26, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
+  appTagline: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   statsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 8,
+    marginHorizontal: 20,
+    marginBottom: 24,
   },
-  statPill: {
+  statCard: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    gap: 2,
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 3,
   },
-  statNum: {
-    fontSize: 18,
-    fontFamily: 'Inter_700Bold',
-  },
-  statLabel: {
-    fontSize: 11,
-    fontFamily: 'Inter_400Regular',
-  },
-  sectionHeader: {
+  statVal: { fontSize: 20, fontFamily: 'Inter_700Bold' },
+  statLbl: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  sectionLabel: {
     fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginTop: 20,
+    marginHorizontal: 22,
     marginBottom: 8,
-    marginLeft: 4,
+    marginTop: 4,
   },
-  section: {
-    borderRadius: 14,
-    borderWidth: 1,
+  group: {
+    marginHorizontal: 20,
+    borderRadius: 18,
+    marginBottom: 22,
     overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 1,
   },
-  rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  rowIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  rowLabel: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowValue: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  premiumCard: {
+    marginHorizontal: 20,
+    borderRadius: 20,
+    padding: 18,
+    gap: 12,
+    marginBottom: 22,
+  },
+  premiumTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  premiumIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  premiumTitle: { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  premiumPrice: { fontSize: 13, fontFamily: 'Inter_500Medium', marginTop: 1 },
+  premiumDesc: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
+  featureGrid: { gap: 8 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkDot: { width: 6, height: 6, borderRadius: 3 },
+  featureText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  premiumBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  rowLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Inter_400Regular',
-  },
-  rowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  rowValue: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
-  premiumCard: {
+    gap: 8,
+    paddingVertical: 15,
     borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    gap: 10,
+    marginTop: 2,
   },
-  premiumHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  premiumTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-  },
-  premiumSub: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 19,
-  },
-  premiumFeatures: {
-    gap: 6,
-  },
-  premiumFeature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  premiumFeatureText: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-  },
-  premiumBtn: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  premiumBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontFamily: 'Inter_700Bold',
-  },
+  premiumBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
 });

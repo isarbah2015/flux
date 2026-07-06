@@ -14,11 +14,10 @@ interface Props {
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
 }
 
 export default function ScreenshotCard({ item }: Props) {
@@ -26,41 +25,41 @@ export default function ScreenshotCard({ item }: Props) {
   const catColor = CATEGORY_COLORS[item.category] ?? '#636384';
   const catIcon = CATEGORY_ICONS[item.category] ?? 'image';
   const catLabel = CATEGORY_LABELS[item.category] ?? 'Other';
-
-  const hasBadge = !!(item.priceTracking?.priceDropped || item.promise || item.calendarEvent);
-
-  function handlePress() {
-    Haptics.selectionAsync();
-    router.push(`/screenshot/${item.id}`);
-  }
+  const hasInsight = !!(item.priceTracking?.priceDropped || item.promise || item.calendarEvent);
 
   return (
     <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => [styles.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+      onPress={() => { Haptics.selectionAsync(); router.push(`/screenshot/${item.id}`); }}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          shadowColor: catColor,
+          transform: [{ scale: pressed ? 0.95 : 1 }],
+        },
+      ]}
     >
-      {/* Thumbnail */}
-      <View style={[styles.thumbnail, { backgroundColor: catColor + '18' }]}>
-        <View style={[styles.accentBar, { backgroundColor: catColor }]} />
-        <View style={styles.iconWrap}>
+      {/* Thumbnail - only this area clips */}
+      <View style={[styles.thumbnail, { backgroundColor: catColor + '16' }]}>
+        {/* Soft corner accent */}
+        <View style={[styles.accentCorner, { backgroundColor: catColor + '30' }]} />
+        <View style={[styles.iconWrap, { backgroundColor: catColor + '28' }]}>
           <Feather name={catIcon as any} size={26} color={catColor} />
         </View>
-        {hasBadge && (
-          <View style={[styles.badge, { backgroundColor: catColor }]}>
-            <Feather name="zap" size={8} color="#fff" />
+        {hasInsight && (
+          <View style={[styles.insightBadge, { backgroundColor: catColor }]}>
+            <Feather name="zap" size={9} color="#fff" />
           </View>
         )}
+        <Text style={[styles.timeStamp, { color: catColor + 'BB' }]}>{timeAgo(item.capturedAt)}</Text>
       </View>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <View style={[styles.catPill, { backgroundColor: catColor + '22' }]}>
-          <Text style={[styles.catText, { color: catColor }]}>{catLabel}</Text>
-        </View>
+      {/* Content – no border, just breathes */}
+      <View style={styles.content}>
+        <Text style={[styles.category, { color: catColor }]}>{catLabel.toUpperCase()}</Text>
         <Text style={[styles.summary, { color: colors.foreground }]} numberOfLines={2}>
           {item.summary}
         </Text>
-        <Text style={[styles.time, { color: colors.mutedForeground }]}>{timeAgo(item.capturedAt)}</Text>
       </View>
     </Pressable>
   );
@@ -69,65 +68,67 @@ export default function ScreenshotCard({ item }: Props) {
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    margin: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
+    margin: 6,
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
   thumbnail: {
-    height: 130,
+    height: 118,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     position: 'relative',
   },
-  accentBar: {
+  accentCorner: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
+    top: -24,
+    right: -24,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    width: 54,
+    height: 54,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badge: {
+  insightBadge: {
     position: 'absolute',
     top: 10,
     right: 10,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footer: {
-    padding: 10,
-    gap: 5,
-  },
-  catPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 20,
-  },
-  catText: {
+  timeStamp: {
+    position: 'absolute',
+    bottom: 8,
+    right: 10,
     fontSize: 10,
-    fontFamily: 'Inter_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontFamily: 'Inter_500Medium',
+  },
+  content: {
+    padding: 12,
+    paddingTop: 10,
+    gap: 4,
+  },
+  category: {
+    fontSize: 9,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 1.2,
   },
   summary: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
     lineHeight: 17,
-  },
-  time: {
-    fontSize: 11,
-    fontFamily: 'Inter_400Regular',
   },
 });

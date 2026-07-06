@@ -7,10 +7,17 @@ import InsightCard from '@/components/InsightCard';
 import { Feather } from '@expo/vector-icons';
 
 const SECTION_TITLES: Record<string, string> = {
-  price_drop: '🔥 Price Drops',
-  price_watch: '👁 Watching',
-  promise: '🤝 Promises',
-  calendar: '📅 Upcoming',
+  price_drop: 'Price Drops',
+  price_watch: 'Watching',
+  promise: 'Promises',
+  calendar: 'Upcoming',
+};
+
+const SECTION_ICONS: Record<string, string> = {
+  price_drop: 'trending-down',
+  price_watch: 'eye',
+  promise: 'user-check',
+  calendar: 'calendar',
 };
 
 function groupInsights(insights: Insight[]): { type: string; data: Insight[] }[] {
@@ -31,24 +38,21 @@ export default function InsightsScreen() {
   const groups = groupInsights(insights);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 60;
+  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
 
   type ListItem =
-    | { kind: 'header'; title: string }
+    | { kind: 'header'; type: string }
     | { kind: 'insight'; insight: Insight };
 
   const listData: ListItem[] = [];
   for (const g of groups) {
-    listData.push({ kind: 'header', title: SECTION_TITLES[g.type] ?? g.type });
-    for (const ins of g.data) {
-      listData.push({ kind: 'insight', insight: ins });
-    }
+    listData.push({ kind: 'header', type: g.type });
+    for (const ins of g.data) listData.push({ kind: 'insight', insight: ins });
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12 }]}>
+      <View style={[styles.header, { paddingTop: topPad + 16 }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Insights</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
           Smart alerts from {totalIndexed} screenshots
@@ -57,35 +61,40 @@ export default function InsightsScreen() {
 
       {insights.length === 0 ? (
         <View style={styles.empty}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-            <Feather name="zap" size={32} color={colors.mutedForeground} />
+          <View style={[styles.emptyIconWrap, { backgroundColor: colors.secondary }]}>
+            <Feather name="zap" size={30} color={colors.mutedForeground} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-            No insights yet
-          </Text>
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No insights yet</Text>
           <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
             {totalIndexed === 0
-              ? 'Grant photo access to start indexing your screenshots.'
-              : 'Price drops, promises, and calendar events will appear here automatically.'}
+              ? 'Grant photo access to start indexing.'
+              : 'Price drops, promises, and events appear here automatically.'}
           </Text>
         </View>
       ) : (
         <FlatList
           data={listData}
           keyExtractor={(item, i) =>
-            item.kind === 'header' ? `h_${item.title}` : item.insight.id
+            item.kind === 'header' ? `h_${item.type}` : item.insight.id
           }
           renderItem={({ item }) => {
             if (item.kind === 'header') {
               return (
-                <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-                  {item.title}
-                </Text>
+                <View style={styles.sectionHeader}>
+                  <Feather
+                    name={SECTION_ICONS[item.type] as any}
+                    size={13}
+                    color={colors.mutedForeground}
+                  />
+                  <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
+                    {SECTION_TITLES[item.type] ?? item.type}
+                  </Text>
+                </View>
               );
             }
             return <InsightCard insight={item.insight} />;
           }}
-          contentContainerStyle={[styles.list, { paddingBottom: botPad }]}
+          contentContainerStyle={{ paddingBottom: botPad, paddingTop: 4 }}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -95,32 +104,22 @@ export default function InsightsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 4,
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
-  list: {
-    paddingTop: 4,
-    paddingBottom: 20,
+  header: { paddingHorizontal: 22, paddingBottom: 16, gap: 3 },
+  title: { fontSize: 30, fontFamily: 'Inter_700Bold', letterSpacing: -1 },
+  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    letterSpacing: 1,
   },
   empty: {
     flex: 1,
@@ -129,17 +128,14 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: 40,
   },
-  emptyIcon: {
+  emptyIconWrap: {
     width: 80,
     height: 80,
-    borderRadius: 24,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
-  },
+  emptyTitle: { fontSize: 20, fontFamily: 'Inter_700Bold' },
   emptySub: {
     fontSize: 15,
     fontFamily: 'Inter_400Regular',

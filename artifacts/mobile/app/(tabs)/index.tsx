@@ -2,7 +2,6 @@ import React, { useCallback } from 'react';
 import {
   FlatList,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,43 +14,33 @@ import ScreenshotCard from '@/components/ScreenshotCard';
 import CategoryPill from '@/components/CategoryPill';
 import OnboardingScreen from '@/components/OnboardingScreen';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
 const CATEGORIES: (Category | 'all')[] = [
-  'all',
-  'shopping',
-  'work',
-  'travel',
-  'receipt',
-  'conversation',
-  'unknown',
+  'all', 'shopping', 'work', 'travel', 'receipt', 'conversation', 'unknown',
 ];
 
 export default function LibraryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
-    hasOnboarded,
-    isLoading,
-    isProcessing,
-    processingProgress,
-    filteredScreenshots,
-    activeCategory,
-    setActiveCategory,
-    totalIndexed,
+    hasOnboarded, isLoading, isProcessing, processingProgress,
+    filteredScreenshots, activeCategory, setActiveCategory, totalIndexed,
   } = useScreenshots();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 60;
+  // Clear the floating pill (66px) + its bottom margin + breathing room
+  const botPad = Platform.OS === 'web' ? 132 : Math.max(insets.bottom, 8) + 98;
+
+  type GridRow = { left: Screenshot; right: Screenshot | null } | '__empty__';
 
   const renderItem = useCallback(
-    ({ item }: { item: { left: Screenshot; right: Screenshot | null } | '__empty__' }) => {
+    ({ item }: { item: GridRow }) => {
       if (item === '__empty__') {
         return (
           <View style={styles.emptyState}>
-            <Feather name="image" size={40} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No screenshots yet</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
+            <Feather name="image" size={38} color={colors.mutedForeground} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Nothing here yet</Text>
+            <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
               Screenshots in this category will appear here
             </Text>
           </View>
@@ -67,61 +56,36 @@ export default function LibraryScreen() {
     [colors],
   );
 
-  // Wait for AsyncStorage to resolve before deciding which screen to show
   if (isLoading) return null;
+  if (!hasOnboarded) return <OnboardingScreen />;
 
-  if (!hasOnboarded) {
-    return <OnboardingScreen />;
-  }
-
-  // Build paired rows for 2-column grid
-  type GridRow = { left: Screenshot; right: Screenshot | null } | '__empty__';
-  const gridData: GridRow[] = filteredScreenshots.length === 0
-    ? ['__empty__']
-    : Array.from({ length: Math.ceil(filteredScreenshots.length / 2) }, (_, i) => ({
-        left: filteredScreenshots[i * 2],
-        right: filteredScreenshots[i * 2 + 1] ?? null,
-      }));
+  const gridData: GridRow[] =
+    filteredScreenshots.length === 0
+      ? ['__empty__']
+      : Array.from({ length: Math.ceil(filteredScreenshots.length / 2) }, (_, i) => ({
+          left: filteredScreenshots[i * 2],
+          right: filteredScreenshots[i * 2 + 1] ?? null,
+        }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12 }]}>
-        <View style={styles.headerLeft}>
-          <Text style={[styles.logo, { color: colors.foreground }]}>Flux</Text>
-          {totalIndexed > 0 && (
-            <View style={[styles.indexedBadge, { backgroundColor: colors.primary + '22' }]}>
-              <Text style={[styles.indexedText, { color: colors.primary }]}>
-                {totalIndexed} indexed
-              </Text>
-            </View>
-          )}
-        </View>
-        <Pressable
-          onPress={() => router.push('/screenshot/1')}
-          style={[styles.headerBtn, { backgroundColor: colors.secondary }]}
-        >
-          <Feather name="sliders" size={18} color={colors.foreground} />
-        </Pressable>
-      </View>
-
-      {/* Processing banner */}
-      {isProcessing && (
-        <View style={[styles.processingBanner, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '44' }]}>
-          <Feather name="cpu" size={14} color={colors.primary} />
-          <Text style={[styles.processingText, { color: colors.primary }]}>
-            Analyzing screenshots… {Math.round(processingProgress)}%
+      <View style={[styles.header, { paddingTop: topPad + 16 }]}>
+        <View>
+          <Text style={[styles.logo, { color: colors.foreground }]}>Library</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+            {totalIndexed} screenshots indexed
           </Text>
-          <View style={[styles.progressTrack, { backgroundColor: colors.primary + '33' }]}>
-            <View
-              style={[
-                styles.progressFill,
-                { backgroundColor: colors.primary, width: `${processingProgress}%` as any },
-              ]}
-            />
-          </View>
         </View>
-      )}
+        {isProcessing && (
+          <View style={[styles.processingPill, { backgroundColor: colors.primary + '22' }]}>
+            <Feather name="cpu" size={12} color={colors.primary} />
+            <Text style={[styles.processingText, { color: colors.primary }]}>
+              {Math.round(processingProgress)}%
+            </Text>
+          </View>
+        )}
+      </View>
 
       {/* Category pills */}
       <ScrollView
@@ -143,7 +107,7 @@ export default function LibraryScreen() {
       {/* Grid */}
       <FlatList
         data={gridData}
-        keyExtractor={(item, i) => (typeof item === 'string' ? item : item.left.id)}
+        keyExtractor={(item) => (typeof item === 'string' ? item : item.left.id)}
         renderItem={renderItem}
         contentContainerStyle={[styles.grid, { paddingBottom: botPad }]}
         showsVerticalScrollIndicator={false}
@@ -154,100 +118,55 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    paddingHorizontal: 22,
+    paddingBottom: 14,
   },
   logo: {
-    fontSize: 28,
+    fontSize: 30,
     fontFamily: 'Inter_700Bold',
     letterSpacing: -1,
   },
-  indexedBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  subtitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    marginTop: 2,
+  },
+  processingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
   },
-  indexedText: {
+  processingText: {
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
   },
-  headerBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  processingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  processingText: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    flex: 1,
-  },
-  progressTrack: {
-    width: 60,
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 4,
-    borderRadius: 2,
-  },
-  pillsScroll: {
-    flexGrow: 0,
-    marginBottom: 8,
-  },
-  pillsRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-  },
-  grid: {
-    paddingHorizontal: 10,
-    paddingTop: 4,
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  emptyCell: {
-    flex: 1,
-    margin: 5,
-  },
+  pillsScroll: { flexGrow: 0, marginBottom: 6 },
+  pillsRow: { paddingHorizontal: 18, paddingVertical: 4 },
+  grid: { paddingHorizontal: 10, paddingTop: 4 },
+  row: { flexDirection: 'row' },
+  emptyCell: { flex: 1, margin: 6 },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 70,
     gap: 10,
   },
   emptyTitle: {
     fontSize: 17,
     fontFamily: 'Inter_600SemiBold',
   },
-  emptySubtitle: {
+  emptySub: {
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
     textAlign: 'center',
-    maxWidth: 260,
+    maxWidth: 240,
   },
 });
