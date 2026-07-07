@@ -16,14 +16,16 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.flux.screenshotos",
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "googleServicesFile": "./firebase/GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#0C0C14"
       },
-      "package": "com.flux.screenshotos"
+      "package": "com.flux.screenshotos",
+      "googleServicesFile": "./firebase/google-services.json"
     },
     "web": {
       "favicon": "./assets/images/icon.png"

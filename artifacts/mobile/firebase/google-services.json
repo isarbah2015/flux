@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "629513991075",
+    "project_id": "flux-screenshotos",
+    "storage_bucket": "flux-screenshotos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:629513991075:android:a5fab6b6763bdf2e432016",
+        "android_client_info": {
+          "package_name": "com.flux.screenshotos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDph3_OAHy_q0ouynDQ71PuVMIXHgbRMUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
