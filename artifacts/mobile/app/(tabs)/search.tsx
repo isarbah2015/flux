@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   Platform,
@@ -65,9 +65,28 @@ function ResultRow({ item, query }: { item: Screenshot; query: string }) {
 export default function SearchScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { searchScreenshots } = useScreenshots();
+  const { searchScreenshotsFts } = useScreenshots();
   const [query, setQuery] = useState('');
-  const results = query.length > 0 ? searchScreenshots(query) : [];
+  const [results, setResults] = useState<Screenshot[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    void searchScreenshotsFts(query).then((hits) => {
+      if (!cancelled) {
+        setResults(hits);
+        setSearching(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [query, searchScreenshotsFts]);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
@@ -118,6 +137,12 @@ export default function SearchScreen() {
               </Pressable>
             ))}
           </View>
+        </View>
+      ) : searching ? (
+        <View style={styles.noResults}>
+          <Text style={[styles.noResultsSub, { color: colors.mutedForeground }]}>
+            Searching on device…
+          </Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.noResults}>

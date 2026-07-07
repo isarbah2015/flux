@@ -10,6 +10,8 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 
 const NATIVE_DRIVER = Platform.OS !== 'web';
+// iSync Pro accent — the single source of the "active" look.
+const ACCENT = '#00E5FF';
 
 const TABS = [
   { name: 'index', icon: 'grid' as const, sf: 'square.grid.2x2.fill' },
@@ -18,32 +20,38 @@ const TABS = [
   { name: 'settings', icon: 'settings' as const, sf: 'gearshape.fill' },
 ];
 
-/** iSync Pro tab — focus bubble + hover/press peek on every tab */
+/**
+ * iSync Pro tab — a single focus bubble is the ONLY active indicator.
+ * Bubble scales/fades in on the active tab; icon scales up; press gives a bounce.
+ */
 function TabButton({
   route,
   index,
   isFocused,
-  colors,
   onPress,
 }: {
   route: { key: string };
   index: number;
   isFocused: boolean;
-  colors: ReturnType<typeof useColors>;
   onPress: () => void;
 }) {
   const tab = TABS[index];
   const pressScale = useRef(new Animated.Value(1)).current;
-  const focusAnim = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
-  const hoverAnim = useRef(new Animated.Value(0)).current;
+  const bubbleScale = useRef(new Animated.Value(isFocused ? 1 : 0.5)).current;
+  const bubbleOpacity = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
   const iconScale = useRef(new Animated.Value(isFocused ? 1.14 : 1)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(focusAnim, {
+      Animated.spring(bubbleScale, {
+        toValue: isFocused ? 1 : 0.5,
+        speed: 18,
+        bounciness: 12,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
+      Animated.timing(bubbleOpacity, {
         toValue: isFocused ? 1 : 0,
-        speed: 18,
-        bounciness: 10,
+        duration: 160,
         useNativeDriver: NATIVE_DRIVER,
       }),
       Animated.spring(iconScale, {
@@ -53,41 +61,7 @@ function TabButton({
         useNativeDriver: NATIVE_DRIVER,
       }),
     ]).start();
-  }, [focusAnim, iconScale, isFocused]);
-
-  function peekIn() {
-    Animated.parallel([
-      Animated.spring(hoverAnim, {
-        toValue: 1,
-        speed: 28,
-        bounciness: 8,
-        useNativeDriver: NATIVE_DRIVER,
-      }),
-      Animated.spring(iconScale, {
-        toValue: 1.12,
-        speed: 28,
-        bounciness: 6,
-        useNativeDriver: NATIVE_DRIVER,
-      }),
-    ]).start();
-  }
-
-  function peekOut() {
-    Animated.parallel([
-      Animated.spring(hoverAnim, {
-        toValue: 0,
-        speed: 24,
-        bounciness: 4,
-        useNativeDriver: NATIVE_DRIVER,
-      }),
-      Animated.spring(iconScale, {
-        toValue: isFocused ? 1.14 : 1,
-        speed: 18,
-        bounciness: 8,
-        useNativeDriver: NATIVE_DRIVER,
-      }),
-    ]).start();
-  }
+  }, [bubbleOpacity, bubbleScale, iconScale, isFocused]);
 
   function handlePress() {
     if (Platform.OS !== 'web') {
@@ -110,63 +84,29 @@ function TabButton({
     onPress();
   }
 
-  const iconColor = isFocused ? colors.accent : colors.mutedForeground;
-
-  const focusBubbleScale = focusAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.5, 1],
-  });
-
-  const hoverBubbleScale = hoverAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 1],
-  });
+  const iconColor = isFocused ? ACCENT : 'rgba(255,255,255,0.42)';
 
   return (
-    <Pressable
-      key={route.key}
-      style={styles.tabBtn}
-      onPress={handlePress}
-      onPressIn={peekIn}
-      onPressOut={peekOut}
-      onHoverIn={Platform.OS === 'web' ? peekIn : undefined}
-      onHoverOut={Platform.OS === 'web' ? peekOut : undefined}
-    >
+    <Pressable key={route.key} style={styles.tabBtn} onPress={handlePress}>
       <Animated.View style={[styles.tabBtnInner, { transform: [{ scale: pressScale }] }]}>
-        {/* Hover / press peek — visible on every tab when touched or hovered */}
         <Animated.View
           style={[
             styles.bubble,
             {
-              opacity: hoverAnim,
-              transform: [{ scale: hoverBubbleScale }],
-              backgroundColor: 'rgba(255,255,255,0.10)',
-              borderColor: 'rgba(255,255,255,0.18)',
-            },
-          ]}
-        />
-        {/* Active tab bubble — iSync cyan accent */}
-        <Animated.View
-          style={[
-            styles.bubble,
-            {
-              opacity: focusAnim,
-              transform: [{ scale: focusBubbleScale }],
-              backgroundColor: 'rgba(0,229,255,0.14)',
-              borderColor: 'rgba(0,229,255,0.32)',
+              opacity: bubbleOpacity,
+              transform: [{ scale: bubbleScale }],
+              backgroundColor: 'rgba(0,229,255,0.12)',
+              borderColor: 'rgba(0,229,255,0.28)',
             },
           ]}
         />
         <Animated.View style={{ transform: [{ scale: iconScale }] }}>
           {Platform.OS === 'ios' ? (
-            <SymbolView name={tab.sf as any} tintColor={iconColor} size={21} />
+            <SymbolView name={tab.sf as any} tintColor={iconColor} size={23} />
           ) : (
-            <Feather name={tab.icon} size={20} color={iconColor} />
+            <Feather name={tab.icon} size={22} color={iconColor} />
           )}
         </Animated.View>
-        {isFocused && (
-          <View style={[styles.activeDot, { backgroundColor: colors.accent }]} />
-        )}
       </Animated.View>
     </Pressable>
   );
@@ -176,92 +116,44 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { hasOnboarded } = useScreenshots();
-  const pillLift = useRef(new Animated.Value(0)).current;
 
   const bottom = Platform.OS === 'web' ? 14 : Math.max(insets.bottom, 6);
-
-  const pillHoverStyle = {
-    transform: [
-      {
-        translateY: pillLift.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, -10],
-        }),
-      },
-    ],
-    shadowOpacity: pillLift.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.55, 0.85],
-    }),
-  };
-
-  function liftPill() {
-    Animated.spring(pillLift, {
-      toValue: 1,
-      useNativeDriver: false,
-      speed: 28,
-      bounciness: 6,
-    }).start();
-  }
-
-  function dropPill() {
-    Animated.spring(pillLift, {
-      toValue: 0,
-      useNativeDriver: false,
-      speed: 28,
-      bounciness: 4,
-    }).start();
-  }
-
-  // Lift the whole pill when the active tab changes.
-  useEffect(() => {
-    liftPill();
-    const timer = setTimeout(dropPill, 220);
-    return () => clearTimeout(timer);
-  }, [state.index]);
 
   if (!hasOnboarded) return null;
 
   return (
     <View style={[styles.wrapper, { bottom: bottom + 6 }]} pointerEvents="box-none">
-      <View style={[styles.glow, { shadowColor: colors.accent }]} pointerEvents="none" />
+      <View style={[styles.glow, { shadowColor: ACCENT }]} pointerEvents="none" />
 
-      <View
-        // @ts-expect-error web hover lifts the whole pill
-        onMouseEnter={liftPill}
-        onMouseLeave={dropPill}
-      >
-        <Animated.View style={[styles.pillShadow, pillHoverStyle]}>
-          <BlurView intensity={55} tint="dark" style={styles.blurPill}>
-            <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
-              {state.routes.map((route: any, index: number) => {
-                const isFocused = state.index === index;
+      <View style={styles.pillShadow}>
+        <BlurView intensity={55} tint="dark" style={styles.blurPill}>
+          <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
+            {state.routes.map((route: any, index: number) => {
+              const isFocused = state.index === index;
 
-                function onPress() {
-                  const event = navigation.emit({
-                    type: 'tabPress',
-                    target: route.key,
-                    canPreventDefault: true,
-                  });
-                  if (!isFocused && !event.defaultPrevented) {
-                    navigation.navigate(route.name);
-                  }
+              function onPress() {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
                 }
+              }
 
-                return (
-                  <TabButton
-                    key={route.key}
-                    route={route}
-                    index={index}
-                    isFocused={isFocused}
-                    colors={colors}
-                    onPress={onPress}
-                  />
-                );
-              })}
-            </View>
-          </BlurView>
-        </Animated.View>
+              return (
+                <TabButton
+                  key={route.key}
+                  route={route}
+                  index={index}
+                  isFocused={isFocused}
+                  onPress={onPress}
+                />
+              );
+            })}
+          </View>
+        </BlurView>
       </View>
     </View>
   );
@@ -331,7 +223,6 @@ const styles = StyleSheet.create({
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
   },
   bubble: {
     position: 'absolute',
@@ -339,10 +230,5 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-  },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
   },
 });

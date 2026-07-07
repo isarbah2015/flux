@@ -19,9 +19,20 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import {
   discoverNewScreenshots,
+  getScreenshotAssetUri,
   markAssetsIndexed,
-  readScreenshotAsset,
 } from '@/lib/screenshot-scanner';
+import {
+  getAllLocalScreenshots,
+  initLocalDb,
+  markLocalSynced,
+  searchLocalScreenshots,
+} from '@/lib/local-db';
+import {
+  localRowToScreenshot,
+  processScreenshotOnDevice,
+} from '@/lib/screenshot-pipeline';
+import type { LocalScreenshotRow } from '@/lib/local-db';
 
 export type Category = 'shopping' | 'work' | 'travel' | 'receipt' | 'conversation' | 'unknown';
 
@@ -103,6 +114,7 @@ interface ScreenshotsContextType {
   refresh: () => void;
   scanDeviceScreenshots: () => Promise<void>;
   searchScreenshots: (query: string) => Screenshot[];
+  searchScreenshotsFts: (query: string) => Promise<Screenshot[]>;
   getInsights: () => Insight[];
   getScreenshot: (id: string) => Screenshot | undefined;
   totalIndexed: number;
@@ -140,6 +152,9 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState<{ done: number; total: number } | null>(null);
+  const [localScreenshots, setLocalScreenshots] = useState<Screenshot[]>([]);
+  const [localReady, setLocalReady] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const scanInFlight = useRef(false);
   const hasBootstrappedScan = useRef(false);
 
@@ -154,6 +169,15 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
     })();
   }, []);
 
+  useEffect(() => {
+    void (async () => {
+      await initLocalDb();
+      const rows = await getAllLocalScreenshots();
+      setLocalScreenshots(rows);
+      setLocalReady(true);
+    })();
+  }, []);
+
   const query = useGetScreenshots(undefined, {
     query: {
       enabled: canFetch,
@@ -164,10 +188,39 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   });
   const createMutation = useCreateScreenshot();
 
-  const screenshots = useMemo<Screenshot[]>(
-    () => (query.data ?? []).map(fromApi),
-    [query.data],
+  const syncRowToApi = useCallback(
+    async (row: LocalScreenshotRow) => {
+      try {
+        await createMutation.mutateAsync({
+          data: {
+            extractedText: row.extractedText,
+            imageUri: row.imageUri,
+            category: row.category,
+            capturedAt: row.capturedAt,
+          },
+        });
+        await markLocalSynced(row.id);
+      } catch {
+        // Offline or API unreachable — local copy is still valid.
+      }
+    },
+    [createMutation],
   );
+
+  const screenshots = useMemo<Screenshot[]>(() => {
+    const api = (query.data ?? []).map(fromApi);
+    const byId = new Map<string, Screenshot>();
+    for (const s of api) byId.set(s.id, s);
+    for (const s of localScreenshots) byId.set(s.id, s);
+    return Array.from(byId.values()).sort(
+      (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
+    );
+  }, [localScreenshots, query.data]);
+
+  const refreshLocal = useCallback(async () => {
+    const rows = await getAllLocalScreenshots();
+    setLocalScreenshots(rows);
+  }, []);
 
   const completeOnboarding = useCallback(async () => {
     setHasOnboarded(true);
@@ -176,18 +229,25 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
 
   const addScreenshot = useCallback(
     async (input: NewScreenshot): Promise<Screenshot> => {
-      const created = await createMutation.mutateAsync({
-        data: {
+      if (!input.imageUri && !input.extractedText?.trim()) {
+        throw new Error('Choose a screenshot or add text so Flux can classify it.');
+      }
+
+      setIsProcessing(true);
+      try {
+        const row = await processScreenshotOnDevice({
+          imageUri: input.imageUri,
           extractedText: input.extractedText,
-          imageBase64: input.imageBase64 ?? null,
-          imageUri: input.imageUri ?? null,
-          category: input.category,
-        },
-      });
-      await queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
-      return fromApi(created);
+        });
+        const shot = localRowToScreenshot(row);
+        setLocalScreenshots((prev) => [shot, ...prev.filter((s) => s.id !== shot.id)]);
+        void syncRowToApi(row);
+        return shot;
+      } finally {
+        setIsProcessing(false);
+      }
     },
-    [createMutation, queryClient],
+    [syncRowToApi],
   );
 
   const scanDeviceScreenshots = useCallback(async () => {
@@ -240,21 +300,25 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
         let roundFailed = 0;
 
         for (const asset of newAssets) {
-          const payload = await readScreenshotAsset(asset);
-          if (!payload) {
+          const uri = await getScreenshotAssetUri(asset);
+          if (!uri) {
             roundFailed += 1;
             continue;
           }
 
           try {
-            await addScreenshot({
-              imageBase64: payload.imageBase64,
-              imageUri: payload.imageUri,
+            const row = await processScreenshotOnDevice({
+              imageUri: uri,
+              localAssetId: asset.id,
+              capturedAt: new Date(asset.creationTime).toISOString(),
             });
+            const shot = localRowToScreenshot(row);
+            setLocalScreenshots((prev) => [shot, ...prev.filter((s) => s.id !== shot.id)]);
             totalImported += 1;
-            indexedIds.push(payload.assetId);
+            indexedIds.push(asset.id);
             setScanProgress({ done: totalImported, total: totalOnDevice });
             setScanMessage(`Importing screenshots… ${totalImported} of ${totalOnDevice}`);
+            void syncRowToApi(row);
           } catch {
             roundFailed += 1;
           }
@@ -262,7 +326,6 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
 
         if (indexedIds.length > 0) {
           await markAssetsIndexed(indexedIds);
-          await queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
         }
 
         if (candidates <= newAssets.length || roundFailed === newAssets.length) {
@@ -285,16 +348,16 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
       setScanProgress(null);
       scanInFlight.current = false;
     }
-  }, [addScreenshot, canFetch, queryClient]);
+  }, [canFetch, syncRowToApi]);
 
-  // Start device scan after the API library has loaded — don't block the grid.
+  // Scan as soon as local DB is ready — no need to wait for API.
   useEffect(() => {
-    if (!canFetch || Platform.OS === 'web' || query.isLoading || hasBootstrappedScan.current) {
+    if (!canFetch || Platform.OS === 'web' || !localReady || hasBootstrappedScan.current) {
       return;
     }
     hasBootstrappedScan.current = true;
     void scanDeviceScreenshots();
-  }, [canFetch, query.isLoading, scanDeviceScreenshots]);
+  }, [canFetch, localReady, scanDeviceScreenshots]);
 
   useEffect(() => {
     if (!canFetch || Platform.OS === 'web') return;
@@ -310,13 +373,19 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   }, [canFetch, scanDeviceScreenshots]);
 
   const refresh = useCallback(() => {
+    void refreshLocal();
     queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
-  }, [queryClient]);
+  }, [queryClient, refreshLocal]);
 
   const filteredScreenshots =
     activeCategory === 'all'
       ? screenshots
       : screenshots.filter((s) => s.category === activeCategory);
+
+  const searchScreenshotsFts = useCallback(async (q: string): Promise<Screenshot[]> => {
+    if (!q.trim()) return [];
+    return searchLocalScreenshots(q);
+  }, []);
 
   const searchScreenshots = useCallback(
     (q: string): Screenshot[] => {
@@ -412,7 +481,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
     <ScreenshotsContext.Provider
       value={{
         screenshots,
-        isImporting: createMutation.isPending,
+        isImporting: isProcessing || createMutation.isPending,
         isScanning,
         scanStatus,
         scanMessage,
@@ -420,7 +489,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
         hasOnboarded,
         onboardingChecked,
         // Library fetch only — auth + splash handled at root BootstrapGate.
-        isLoading: hasOnboarded && canFetch && query.isLoading && !query.data,
+        isLoading: hasOnboarded && !localReady,
         error: query.error,
         activeCategory,
         setActiveCategory,
@@ -430,6 +499,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
         scanDeviceScreenshots,
         refresh,
         searchScreenshots,
+        searchScreenshotsFts,
         getInsights,
         getScreenshot,
         totalIndexed: screenshots.length,

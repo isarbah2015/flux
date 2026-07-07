@@ -60,6 +60,8 @@
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",
+    "expo-sqlite": "~16.0.10",
+    "expo-text-extractor": "^2.0.0",
     "firebase": "^12.15.0"
   }
 }

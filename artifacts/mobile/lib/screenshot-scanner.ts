@@ -195,6 +195,11 @@ async function resolveReadableUri(asset: MediaLibrary.Asset): Promise<string | n
   return uri.startsWith('ph://') ? null : uri;
 }
 
+/** Resolve a readable file URI for an asset (no base64 read). */
+export async function getScreenshotAssetUri(asset: MediaLibrary.Asset): Promise<string | null> {
+  return resolveReadableUri(asset);
+}
+
 /** Read one gallery asset as base64 for upload. */
 export async function readScreenshotAsset(
   asset: MediaLibrary.Asset,

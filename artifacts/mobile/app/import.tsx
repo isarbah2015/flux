@@ -58,7 +58,6 @@ export default function ImportScreen() {
       setError(null);
       await addScreenshot({
         extractedText: text.trim() || undefined,
-        imageBase64,
         imageUri,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
