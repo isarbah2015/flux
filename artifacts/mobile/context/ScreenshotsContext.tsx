@@ -199,6 +199,14 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
     try {
       const { permission, newAssets } = await discoverNewScreenshots();
 
+      if (permission === 'unavailable') {
+        setScanStatus('denied');
+        setScanMessage(
+          'Auto-scan needs a development build on Android. Use + Import to add screenshots in Expo Go.',
+        );
+        return;
+      }
+
       if (permission === 'denied') {
         setScanStatus('denied');
         setScanMessage('Allow photo access so Flux can detect screenshots automatically.');

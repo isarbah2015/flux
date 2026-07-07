@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MediaLibrary from 'expo-media-library';
 import { readAsStringAsync } from 'expo-file-system/legacy';
@@ -6,8 +7,9 @@ import { readAsStringAsync } from 'expo-file-system/legacy';
 const INDEXED_ASSETS_KEY = 'flux_indexed_asset_ids';
 const MAX_CANDIDATES = 60;
 const MAX_IMPORT_PER_SCAN = 20;
+const PHOTO_ONLY: MediaLibrary.GranularPermission[] = ['photo'];
 
-export type ScreenshotAccess = 'granted' | 'denied' | 'limited';
+export type ScreenshotAccess = 'granted' | 'denied' | 'limited' | 'unavailable';
 
 export type ScannedScreenshot = {
   assetId: string;
@@ -23,12 +25,29 @@ export type DeviceScanSummary = {
   newAssets: MediaLibrary.Asset[];
 };
 
+function isExpoGoAndroid(): boolean {
+  return Platform.OS === 'android' && Constants.appOwnership === 'expo';
+}
+
 /** Ask for photo-library access (Screenshots album lives inside it). */
 export async function requestScreenshotLibraryAccess(): Promise<ScreenshotAccess> {
-  const result = await MediaLibrary.requestPermissionsAsync();
-  if (result.status !== 'granted') return 'denied';
-  if (result.accessPrivileges === 'limited') return 'limited';
-  return 'granted';
+  if (isExpoGoAndroid()) {
+    // Expo Go's Android manifest can't be customized — auto-scan needs a dev build.
+    return 'unavailable';
+  }
+
+  try {
+    const result =
+      Platform.OS === 'android'
+        ? await MediaLibrary.requestPermissionsAsync(false, PHOTO_ONLY)
+        : await MediaLibrary.requestPermissionsAsync();
+
+    if (result.status !== 'granted') return 'denied';
+    if (result.accessPrivileges === 'limited') return 'limited';
+    return 'granted';
+  } catch {
+    return 'denied';
+  }
 }
 
 async function readIndexedAssetIds(): Promise<Set<string>> {

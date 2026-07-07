@@ -51,7 +51,8 @@
         {
           "photosPermission": "Flux reads your Screenshots album to classify and organize them automatically.",
           "savePhotosPermission": "Allow Flux to access photos.",
-          "isAccessMediaLocationEnabled": false
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": ["photo"]
         }
       ]
     ],
