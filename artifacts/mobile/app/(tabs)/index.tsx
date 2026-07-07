@@ -33,6 +33,7 @@ export default function LibraryScreen() {
     isLoading,
     isScanning,
     scanMessage,
+    scanProgress,
     scanDeviceScreenshots,
   } = useScreenshots();
 
@@ -148,7 +149,11 @@ export default function LibraryScreen() {
             color={isScanning ? colors.primary : '#30D158'}
           />
           <Text style={[styles.scanBannerText, { color: colors.mutedForeground }]}>
-            {isScanning ? 'Scanning your Screenshots album…' : scanMessage}
+            {isScanning && scanProgress
+              ? scanMessage
+              : isScanning
+                ? 'Scanning your Screenshots album…'
+                : scanMessage}
           </Text>
         </View>
       )}

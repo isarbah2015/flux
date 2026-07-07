@@ -5,8 +5,9 @@ import * as MediaLibrary from 'expo-media-library';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 
 const INDEXED_ASSETS_KEY = 'flux_indexed_asset_ids';
-const MAX_CANDIDATES = 60;
-const MAX_IMPORT_PER_SCAN = 20;
+const PAGE_SIZE = 100;
+const MAX_TOTAL_ASSETS = 500;
+const MAX_IMPORT_PER_SCAN = 15;
 const PHOTO_ONLY: MediaLibrary.GranularPermission[] = ['photo'];
 
 export type ScreenshotAccess = 'granted' | 'denied' | 'limited' | 'unavailable';
@@ -23,19 +24,22 @@ export type DeviceScanSummary = {
   permission: ScreenshotAccess;
   candidates: number;
   newAssets: MediaLibrary.Asset[];
+  totalOnDevice: number;
 };
 
-function isExpoGoAndroid(): boolean {
-  return Platform.OS === 'android' && Constants.appOwnership === 'expo';
+function isScreenshotFilename(filename: string): boolean {
+  const name = filename.toLowerCase();
+  return (
+    name.includes('screenshot') ||
+    name.startsWith('screen_') ||
+    name.startsWith('scr_') ||
+    name.includes('screen-') ||
+    name.includes('capture')
+  );
 }
 
 /** Ask for photo-library access (Screenshots album lives inside it). */
 export async function requestScreenshotLibraryAccess(): Promise<ScreenshotAccess> {
-  if (isExpoGoAndroid()) {
-    // Expo Go's Android manifest can't be customized — auto-scan needs a dev build.
-    return 'unavailable';
-  }
-
   try {
     const result =
       Platform.OS === 'android'
@@ -46,6 +50,10 @@ export async function requestScreenshotLibraryAccess(): Promise<ScreenshotAccess
     if (result.accessPrivileges === 'limited') return 'limited';
     return 'granted';
   } catch {
+    // Expo Go on Android may reject — caller can fall back to manual import.
+    if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+      return 'unavailable';
+    }
     return 'denied';
   }
 }
@@ -63,7 +71,7 @@ async function readIndexedAssetIds(): Promise<Set<string>> {
   }
 }
 
-/** Remember device asset IDs we've already sent to the API (even if upload failed). */
+/** Remember device asset IDs we've already sent to the API. */
 export async function markAssetsIndexed(assetIds: string[]): Promise<void> {
   if (assetIds.length === 0) return;
 
@@ -72,17 +80,6 @@ export async function markAssetsIndexed(assetIds: string[]): Promise<void> {
 
   const capped = Array.from(existing).slice(-5000);
   await AsyncStorage.setItem(INDEXED_ASSETS_KEY, JSON.stringify(capped));
-}
-
-function isScreenshotFilename(filename: string): boolean {
-  const name = filename.toLowerCase();
-  return (
-    name.includes('screenshot') ||
-    name.startsWith('screen_') ||
-    name.startsWith('scr_') ||
-    name.includes('screen-') ||
-    name.includes('capture')
-  );
 }
 
 async function findScreenshotsAlbum(): Promise<MediaLibrary.Album | null> {
@@ -94,56 +91,85 @@ async function findScreenshotsAlbum(): Promise<MediaLibrary.Album | null> {
   );
 }
 
-async function loadScreenshotCandidates(): Promise<MediaLibrary.Asset[]> {
+type PageOptions = Omit<MediaLibrary.AssetsOptions, 'after' | 'first'>;
+
+/** Paginate through the library — mirrors iOS PHAsset mediaSubtype screenshot fetch. */
+async function paginateAssets(options: PageOptions): Promise<MediaLibrary.Asset[]> {
+  const collected: MediaLibrary.Asset[] = [];
+  let after: string | undefined;
+  let hasNext = true;
+
+  while (hasNext && collected.length < MAX_TOTAL_ASSETS) {
+    const page = await MediaLibrary.getAssetsAsync({
+      ...options,
+      first: PAGE_SIZE,
+      after,
+    });
+
+    collected.push(...page.assets);
+    hasNext = page.hasNextPage;
+    after = page.endCursor;
+  }
+
+  return collected;
+}
+
+/**
+ * Load every screenshot on the device.
+ * iOS: mediaSubtypes screenshot (same as PHAssetMediaSubtype.photoScreenshot).
+ * Android: Screenshots album, then filename heuristics.
+ */
+async function loadAllScreenshotCandidates(): Promise<MediaLibrary.Asset[]> {
   const album = await findScreenshotsAlbum();
 
   if (album) {
-    const page = await MediaLibrary.getAssetsAsync({
+    return paginateAssets({
       album,
       mediaType: MediaLibrary.MediaType.photo,
       sortBy: [[MediaLibrary.SortBy.creationTime, false]],
-      first: MAX_CANDIDATES,
     });
-    return page.assets;
   }
 
   if (Platform.OS === 'ios') {
-    const page = await MediaLibrary.getAssetsAsync({
+    const iosShots = await paginateAssets({
       mediaType: MediaLibrary.MediaType.photo,
       mediaSubtypes: ['screenshot'],
       sortBy: [[MediaLibrary.SortBy.creationTime, false]],
-      first: MAX_CANDIDATES,
     });
-    if (page.assets.length > 0) return page.assets;
+    if (iosShots.length > 0) return iosShots;
   }
 
-  const page = await MediaLibrary.getAssetsAsync({
+  const recent = await paginateAssets({
     mediaType: MediaLibrary.MediaType.photo,
     sortBy: [[MediaLibrary.SortBy.creationTime, false]],
-    first: MAX_CANDIDATES,
   });
 
-  return page.assets.filter((asset) => isScreenshotFilename(asset.filename));
+  return recent.filter((asset) => isScreenshotFilename(asset.filename));
 }
 
 /** List screenshot assets on device that Flux has not indexed yet. */
 export async function discoverNewScreenshots(): Promise<DeviceScanSummary> {
   const permission = await requestScreenshotLibraryAccess();
-  if (permission === 'denied') {
-    return { permission, candidates: 0, newAssets: [] };
+  if (permission === 'denied' || permission === 'unavailable') {
+    return { permission, candidates: 0, newAssets: [], totalOnDevice: 0 };
   }
 
-  if (permission === 'limited' && Platform.OS === 'ios') {
+  if (permission === 'limited') {
     await MediaLibrary.presentPermissionsPickerAsync(['photo']).catch(() => undefined);
   }
 
   const indexed = await readIndexedAssetIds();
-  const candidates = await loadScreenshotCandidates();
-  const newAssets = candidates
+  const allCandidates = await loadAllScreenshotCandidates();
+  const newAssets = allCandidates
     .filter((asset) => !indexed.has(asset.id))
     .slice(0, MAX_IMPORT_PER_SCAN);
 
-  return { permission, candidates: candidates.length, newAssets };
+  return {
+    permission,
+    candidates: allCandidates.filter((a) => !indexed.has(a.id)).length,
+    newAssets,
+    totalOnDevice: allCandidates.length,
+  };
 }
 
 async function resolveReadableUri(asset: MediaLibrary.Asset): Promise<string | null> {
@@ -158,7 +184,6 @@ async function resolveReadableUri(asset: MediaLibrary.Asset): Promise<string | n
     return uri;
   }
 
-  // iOS ph:// assets occasionally need a second fetch after iCloud download.
   if (Platform.OS === 'ios') {
     const retry = await MediaLibrary.getAssetInfoAsync(asset.id, {
       shouldDownloadFromNetwork: true,

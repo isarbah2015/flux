@@ -90,6 +90,7 @@ interface ScreenshotsContextType {
   isScanning: boolean;
   scanStatus: ScanStatus;
   scanMessage: string | null;
+  scanProgress: { done: number; total: number } | null;
   hasOnboarded: boolean;
   onboardingChecked: boolean;
   isLoading: boolean;
@@ -138,6 +139,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [scanProgress, setScanProgress] = useState<{ done: number; total: number } | null>(null);
   const scanInFlight = useRef(false);
   const hasBootstrappedScan = useRef(false);
 
@@ -194,82 +196,105 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
     scanInFlight.current = true;
     setIsScanning(true);
     setScanStatus('scanning');
-    setScanMessage(null);
+    setScanMessage('Looking for screenshots on your device…');
+    setScanProgress(null);
+
+    let totalImported = 0;
+    let deviceTotal = 0;
 
     try {
-      const { permission, newAssets } = await discoverNewScreenshots();
+      const MAX_ROUNDS = 12;
 
-      if (permission === 'unavailable') {
-        setScanStatus('denied');
+      for (let round = 0; round < MAX_ROUNDS; round += 1) {
+        const { permission, newAssets, candidates, totalOnDevice } =
+          await discoverNewScreenshots();
+
+        deviceTotal = totalOnDevice;
+
+        if (permission === 'unavailable') {
+          setScanStatus('denied');
+          setScanMessage(
+            'Auto-scan needs a development build on Android. Tap + to import screenshots manually.',
+          );
+          return;
+        }
+
+        if (permission === 'denied') {
+          setScanStatus('denied');
+          setScanMessage('Allow photo access so Flux can find your screenshots.');
+          return;
+        }
+
+        if (newAssets.length === 0) {
+          break;
+        }
+
+        setScanProgress({ done: totalImported, total: totalOnDevice });
         setScanMessage(
-          'Auto-scan needs a development build on Android. Use + Import to add screenshots in Expo Go.',
+          totalOnDevice > 0
+            ? `Importing screenshots… ${totalImported} of ${totalOnDevice}`
+            : 'Importing screenshots…',
         );
-        return;
-      }
 
-      if (permission === 'denied') {
-        setScanStatus('denied');
-        setScanMessage('Allow photo access so Flux can detect screenshots automatically.');
-        return;
-      }
+        const indexedIds: string[] = [];
+        let roundFailed = 0;
 
-      if (newAssets.length === 0) {
-        setScanStatus('done');
-        setScanMessage(null);
-        return;
-      }
+        for (const asset of newAssets) {
+          const payload = await readScreenshotAsset(asset);
+          if (!payload) {
+            roundFailed += 1;
+            continue;
+          }
 
-      let imported = 0;
-      let failed = 0;
-      const indexedIds: string[] = [];
-
-      for (const asset of newAssets) {
-        const payload = await readScreenshotAsset(asset);
-        if (!payload) {
-          failed += 1;
-          continue;
+          try {
+            await addScreenshot({
+              imageBase64: payload.imageBase64,
+              imageUri: payload.imageUri,
+            });
+            totalImported += 1;
+            indexedIds.push(payload.assetId);
+            setScanProgress({ done: totalImported, total: totalOnDevice });
+            setScanMessage(`Importing screenshots… ${totalImported} of ${totalOnDevice}`);
+          } catch {
+            roundFailed += 1;
+          }
         }
 
-        try {
-          await addScreenshot({
-            imageBase64: payload.imageBase64,
-            imageUri: payload.imageUri,
-          });
-          imported += 1;
-          indexedIds.push(payload.assetId);
-        } catch {
-          failed += 1;
+        if (indexedIds.length > 0) {
+          await markAssetsIndexed(indexedIds);
+          await queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-
-      if (indexedIds.length > 0) {
-        await markAssetsIndexed(indexedIds);
-        await queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
+        if (candidates <= newAssets.length || roundFailed === newAssets.length) {
+          break;
+        }
       }
 
       setScanStatus('done');
-      if (imported > 0) {
+      if (totalImported > 0) {
         setScanMessage(
-          `Detected and imported ${imported} screenshot${imported === 1 ? '' : 's'}.`,
+          `Imported ${totalImported} screenshot${totalImported === 1 ? '' : 's'} from your library.`,
         );
-      } else if (failed > 0) {
-        setScanMessage(
-          'Found screenshots on your device but could not upload them. Check that the API server is running.',
-        );
+      } else if (deviceTotal > 0) {
+        setScanMessage(`${deviceTotal} screenshots found — all already indexed.`);
+      } else {
+        setScanMessage(null);
       }
     } finally {
       setIsScanning(false);
+      setScanProgress(null);
       scanInFlight.current = false;
     }
   }, [addScreenshot, canFetch, queryClient]);
 
+  // Start device scan after the API library has loaded — don't block the grid.
   useEffect(() => {
-    if (!canFetch || Platform.OS === 'web' || hasBootstrappedScan.current) return;
+    if (!canFetch || Platform.OS === 'web' || query.isLoading || hasBootstrappedScan.current) {
+      return;
+    }
     hasBootstrappedScan.current = true;
     void scanDeviceScreenshots();
-  }, [canFetch, scanDeviceScreenshots]);
+  }, [canFetch, query.isLoading, scanDeviceScreenshots]);
 
   useEffect(() => {
     if (!canFetch || Platform.OS === 'web') return;
@@ -391,6 +416,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
         isScanning,
         scanStatus,
         scanMessage,
+        scanProgress,
         hasOnboarded,
         onboardingChecked,
         // Library fetch only — auth + splash handled at root BootstrapGate.
