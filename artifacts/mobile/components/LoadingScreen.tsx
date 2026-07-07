@@ -8,13 +8,11 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import FluxLogo from '@/components/FluxLogo';
 
 /**
  * Branded loading state shown while auth / onboarding / the first fetch resolve.
- * Replaces a blank screen so cold starts feel intentional rather than frozen.
  */
 export default function LoadingScreen({ label }: { label?: string }) {
   const colors = useColors();
@@ -31,14 +29,14 @@ export default function LoadingScreen({ label }: { label?: string }) {
     );
   }, [pulse]);
 
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.35 + pulse.value * 0.5,
-    transform: [{ scale: 0.94 + pulse.value * 0.12 }],
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: 0.85 + pulse.value * 0.15,
+    transform: [{ scale: 0.96 + pulse.value * 0.06 }],
   }));
 
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: 0.15 + pulse.value * 0.25,
-    transform: [{ scale: 1 + pulse.value * 0.35 }],
+    opacity: 0.12 + pulse.value * 0.2,
+    transform: [{ scale: 1 + pulse.value * 0.2 }],
   }));
 
   return (
@@ -47,15 +45,8 @@ export default function LoadingScreen({ label }: { label?: string }) {
         <Animated.View
           style={[styles.ring, { borderColor: colors.primary }, ringStyle]}
         />
-        <Animated.View style={glowStyle}>
-          <LinearGradient
-            colors={[colors.primary, colors.accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logo}
-          >
-            <Feather name="zap" size={30} color="#fff" />
-          </LinearGradient>
+        <Animated.View style={logoStyle}>
+          <FluxLogo size={88} />
         </Animated.View>
         <Text style={[styles.brand, { color: colors.foreground }]}>Flux</Text>
         <Text style={[styles.label, { color: colors.mutedForeground }]}>
@@ -71,18 +62,11 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', gap: 14 },
   ring: {
     position: 'absolute',
-    top: -18,
-    width: 108,
-    height: 108,
-    borderRadius: 54,
+    top: -14,
+    width: 116,
+    height: 116,
+    borderRadius: 58,
     borderWidth: 2,
-  },
-  logo: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   brand: {
     fontSize: 26,

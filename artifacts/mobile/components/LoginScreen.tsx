@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { injectWebStyles } from '@/lib/webStyles';
+import FluxLogo from '@/components/FluxLogo';
 
 type Mode = 'signin' | 'signup';
 
@@ -90,14 +91,7 @@ export default function LoginScreen() {
 
       <View style={[styles.inner, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.hero}>
-          <LinearGradient
-            colors={[colors.primary, colors.accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logo}
-          >
-            <Feather name="zap" size={32} color="#fff" />
-          </LinearGradient>
+          <FluxLogo size={88} />
           <Text style={[styles.title, { color: colors.foreground }]}>Flux</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
             {mode === 'signin'
