@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signOut as fbSignOut,
   type User,
@@ -17,6 +19,7 @@ interface AuthContextType {
   user: User | null;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithGoogleIdToken: (idToken: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -61,6 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async signUpWithEmail(email, password) {
         if (!auth) throw new Error('Firebase auth is not configured.');
         await createUserWithEmailAndPassword(auth, email, password);
+      },
+      async signInWithGoogleIdToken(idToken) {
+        if (!auth) throw new Error('Firebase auth is not configured.');
+        await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
       },
       async signOut() {
         if (!auth) return;

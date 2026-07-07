@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
+import { isGoogleSignInConfigured, useGoogleSignIn } from '@/lib/google-sign-in';
 import { injectWebStyles } from '@/lib/webStyles';
 import FluxLogo from '@/components/FluxLogo';
 
@@ -32,6 +33,10 @@ function friendlyError(e: unknown): string {
       return 'An account already exists for that email.';
     case 'auth/weak-password':
       return 'Password should be at least 6 characters.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with this email using a different sign-in method.';
+    case 'auth/popup-closed-by-user':
+      return 'Sign-in was cancelled.';
     default:
       return e instanceof Error ? e.message : 'Something went wrong. Try again.';
   }
@@ -42,13 +47,29 @@ export default function LoginScreen() {
 
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithEmail, signUpWithEmail, signInWithGoogleIdToken } = useAuth();
+  const google = useGoogleSignIn();
+  const googleEnabled = isGoogleSignInConfigured();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function submitGoogle() {
+    setBusy(true);
+    setError(null);
+    try {
+      const idToken = await google.signIn();
+      if (!idToken) return;
+      await signInWithGoogleIdToken(idToken);
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit() {
     if (!email.trim() || !password) {
@@ -160,6 +181,40 @@ export default function LoginScreen() {
             </LinearGradient>
           </Pressable>
 
+          {googleEnabled && (
+            <>
+              <View style={styles.dividerRow}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              </View>
+
+              <Pressable
+                onPress={submitGoogle}
+                disabled={busy || !google.ready}
+                style={({ pressed }) => [
+                  styles.googleBtn,
+                  {
+                    backgroundColor: colors.secondary,
+                    borderColor: colors.border,
+                    opacity: busy || !google.ready ? 0.6 : pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                {busy ? (
+                  <ActivityIndicator color={colors.foreground} />
+                ) : (
+                  <>
+                    <Feather name="globe" size={18} color={colors.foreground} />
+                    <Text style={[styles.googleBtnText, { color: colors.foreground }]}>
+                      Continue with Google
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </>
+          )}
+
           <Pressable
             onPress={() => {
               setMode(mode === 'signin' ? 'signup' : 'signin');
@@ -176,7 +231,9 @@ export default function LoginScreen() {
         </View>
 
         <Text style={[styles.note, { color: colors.mutedForeground }]}>
-          Google & phone sign-in available in a native build
+          {googleEnabled
+            ? 'Sign in securely with Firebase'
+            : 'Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to enable Google sign-in'}
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -237,6 +294,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { fontSize: 16, fontFamily: 'DMSans_600SemiBold', color: '#fff' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
+  googleBtn: {
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  googleBtnText: { fontSize: 15, fontFamily: 'DMSans_600SemiBold' },
   toggle: { fontSize: 14, fontFamily: 'DMSans_400Regular', textAlign: 'center', marginTop: 4 },
   note: { fontSize: 12, fontFamily: 'DMSans_400Regular', textAlign: 'center' },
 });
