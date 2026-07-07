@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useScreenshots } from '@/context/ScreenshotsContext';
+import { formatApiError } from '@/lib/format-api-error';
 
 export default function ImportScreen() {
   const colors = useColors();
@@ -63,7 +64,7 @@ export default function ImportScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Import failed. Is the API server reachable?');
+      setError(formatApiError(e));
     }
   }
 

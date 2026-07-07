@@ -26,8 +26,20 @@ export default function LibraryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
-    filteredScreenshots, activeCategory, setActiveCategory, totalIndexed, isLoading,
+    filteredScreenshots,
+    activeCategory,
+    setActiveCategory,
+    totalIndexed,
+    isLoading,
+    isScanning,
+    scanMessage,
+    scanDeviceScreenshots,
   } = useScreenshots();
+
+  const runScan = useCallback(() => {
+    Haptics.selectionAsync();
+    void scanDeviceScreenshots();
+  }, [scanDeviceScreenshots]);
 
   const openImport = useCallback(() => {
     Haptics.selectionAsync();
@@ -50,7 +62,7 @@ export default function LibraryScreen() {
             <Feather name="image" size={38} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Nothing here yet</Text>
             <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-              Screenshots in this category will appear here
+              Take a screenshot, open Flux, or tap the scan button above
             </Text>
           </View>
         );
@@ -95,17 +107,51 @@ export default function LibraryScreen() {
             </Text>
           </View>
         </View>
-        <Pressable
-          onPress={openImport}
-          hitSlop={10}
-          style={({ pressed }) => [
-            styles.importBtn,
-            { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.92 : 1 }] },
-          ]}
-        >
-          <Feather name="plus" size={20} color={colors.primaryForeground} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={runScan}
+            disabled={isScanning}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.scanBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                opacity: isScanning ? 0.6 : pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            {isScanning ? (
+              <Feather name="loader" size={18} color={colors.primary} />
+            ) : (
+              <Feather name="refresh-cw" size={18} color={colors.foreground} />
+            )}
+          </Pressable>
+          <Pressable
+            onPress={openImport}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.importBtn,
+              { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.92 : 1 }] },
+            ]}
+          >
+            <Feather name="plus" size={20} color={colors.primaryForeground} />
+          </Pressable>
+        </View>
       </View>
+
+      {(isScanning || scanMessage) && (
+        <View style={[styles.scanBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather
+            name={isScanning ? 'smartphone' : 'check-circle'}
+            size={16}
+            color={isScanning ? colors.primary : '#30D158'}
+          />
+          <Text style={[styles.scanBannerText, { color: colors.mutedForeground }]}>
+            {isScanning ? 'Scanning your Screenshots album…' : scanMessage}
+          </Text>
+        </View>
+      )}
 
       {/* Category pills — inner View carries the padding so left edge isn't clipped on web */}
       <ScrollView
@@ -164,6 +210,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'DMSans_400Regular',
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  scanBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 22,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  scanBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'DMSans_400Regular',
+    lineHeight: 18,
   },
   importBtn: {
     width: 42,

@@ -1,4 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -8,6 +17,11 @@ import {
   type Screenshot as ApiScreenshot,
 } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
+import {
+  discoverNewScreenshots,
+  markAssetsIndexed,
+  readScreenshotAsset,
+} from '@/lib/screenshot-scanner';
 
 export type Category = 'shopping' | 'work' | 'travel' | 'receipt' | 'conversation' | 'unknown';
 
@@ -68,9 +82,14 @@ export interface NewScreenshot {
   category?: Category;
 }
 
+export type ScanStatus = 'idle' | 'scanning' | 'denied' | 'done';
+
 interface ScreenshotsContextType {
   screenshots: Screenshot[];
   isImporting: boolean;
+  isScanning: boolean;
+  scanStatus: ScanStatus;
+  scanMessage: string | null;
   hasOnboarded: boolean;
   onboardingChecked: boolean;
   isLoading: boolean;
@@ -81,6 +100,7 @@ interface ScreenshotsContextType {
   completeOnboarding: () => void;
   addScreenshot: (input: NewScreenshot) => Promise<Screenshot>;
   refresh: () => void;
+  scanDeviceScreenshots: () => Promise<void>;
   searchScreenshots: (query: string) => Screenshot[];
   getInsights: () => Insight[];
   getScreenshot: (id: string) => Screenshot | undefined;
@@ -115,6 +135,11 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const scanInFlight = useRef(false);
+  const hasBootstrappedScan = useRef(false);
 
   // Fetch only once onboarded and (when auth is on) signed in.
   const canFetch = hasOnboarded && (!authEnabled || (authReady && !!user));
@@ -162,6 +187,94 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
     },
     [createMutation, queryClient],
   );
+
+  const scanDeviceScreenshots = useCallback(async () => {
+    if (scanInFlight.current || !canFetch || Platform.OS === 'web') return;
+
+    scanInFlight.current = true;
+    setIsScanning(true);
+    setScanStatus('scanning');
+    setScanMessage(null);
+
+    try {
+      const { permission, newAssets } = await discoverNewScreenshots();
+
+      if (permission === 'denied') {
+        setScanStatus('denied');
+        setScanMessage('Allow photo access so Flux can detect screenshots automatically.');
+        return;
+      }
+
+      if (newAssets.length === 0) {
+        setScanStatus('done');
+        setScanMessage(null);
+        return;
+      }
+
+      let imported = 0;
+      let failed = 0;
+      const indexedIds: string[] = [];
+
+      for (const asset of newAssets) {
+        const payload = await readScreenshotAsset(asset);
+        if (!payload) {
+          failed += 1;
+          continue;
+        }
+
+        try {
+          await addScreenshot({
+            imageBase64: payload.imageBase64,
+            imageUri: payload.imageUri,
+          });
+          imported += 1;
+          indexedIds.push(payload.assetId);
+        } catch {
+          failed += 1;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      if (indexedIds.length > 0) {
+        await markAssetsIndexed(indexedIds);
+        await queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
+      }
+
+      setScanStatus('done');
+      if (imported > 0) {
+        setScanMessage(
+          `Detected and imported ${imported} screenshot${imported === 1 ? '' : 's'}.`,
+        );
+      } else if (failed > 0) {
+        setScanMessage(
+          'Found screenshots on your device but could not upload them. Check that the API server is running.',
+        );
+      }
+    } finally {
+      setIsScanning(false);
+      scanInFlight.current = false;
+    }
+  }, [addScreenshot, canFetch, queryClient]);
+
+  useEffect(() => {
+    if (!canFetch || Platform.OS === 'web' || hasBootstrappedScan.current) return;
+    hasBootstrappedScan.current = true;
+    void scanDeviceScreenshots();
+  }, [canFetch, scanDeviceScreenshots]);
+
+  useEffect(() => {
+    if (!canFetch || Platform.OS === 'web') return;
+
+    const onAppState = (state: AppStateStatus) => {
+      if (state === 'active') {
+        void scanDeviceScreenshots();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', onAppState);
+    return () => subscription.remove();
+  }, [canFetch, scanDeviceScreenshots]);
 
   const refresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
@@ -267,6 +380,9 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
       value={{
         screenshots,
         isImporting: createMutation.isPending,
+        isScanning,
+        scanStatus,
+        scanMessage,
         hasOnboarded,
         onboardingChecked,
         // Library fetch only — auth + splash handled at root BootstrapGate.
@@ -277,6 +393,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
         filteredScreenshots,
         completeOnboarding,
         addScreenshot,
+        scanDeviceScreenshots,
         refresh,
         searchScreenshots,
         getInsights,
