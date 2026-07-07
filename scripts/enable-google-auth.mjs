@@ -6,12 +6,16 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID ?? 'flux-screenshotos';
 const PROJECT_NUMBER = '629513991075';
-const ENV_FILE = path.resolve(
-  process.argv[2] ?? 'artifacts/mobile/.env',
-);
+const ENV_FILE = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(REPO_ROOT, 'artifacts/mobile/.env');
 const FIREBASE_CFG = path.join(
   os.homedir(),
   '.config/configstore/firebase-tools.json',
