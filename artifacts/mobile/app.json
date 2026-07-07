@@ -32,6 +32,14 @@
     },
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
@@ -65,7 +73,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.629513991075-3cveb0kbok06hn5g2eccleo4b34pche3"
         }
-      ]
+      ],
+      "./plugins/with-ndk-version.js"
     ],
     "experiments": {
       "typedRoutes": true
