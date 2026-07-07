@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -9,88 +9,111 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 
+const NATIVE_DRIVER = Platform.OS !== 'web';
+
 const TABS = [
-  { name: 'index',    icon: 'grid'     as const, sf: 'square.grid.2x2.fill' },
-  { name: 'search',   icon: 'search'   as const, sf: 'magnifyingglass'       },
-  { name: 'insights', icon: 'zap'      as const, sf: 'sparkles'              },
-  { name: 'settings', icon: 'settings' as const, sf: 'gearshape.fill'        },
+  { name: 'index', icon: 'grid' as const, sf: 'square.grid.2x2.fill' },
+  { name: 'search', icon: 'search' as const, sf: 'magnifyingglass' },
+  { name: 'insights', icon: 'zap' as const, sf: 'sparkles' },
+  { name: 'settings', icon: 'settings' as const, sf: 'gearshape.fill' },
 ];
 
-/** One animated tab button — handles hover + press independently */
+/** Tab button — iSync Pro focus-bubble + press bounce (same pattern as FloatingTabBar) */
 function TabButton({
   route,
   index,
   isFocused,
   colors,
   onPress,
+  onPressIn,
+  onPressOut,
 }: {
-  route: any;
+  route: { key: string };
   index: number;
   isFocused: boolean;
-  colors: any;
+  colors: ReturnType<typeof useColors>;
   onPress: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
 }) {
   const tab = TABS[index];
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim  = useRef(new Animated.Value(0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const bubbleScale = useRef(new Animated.Value(isFocused ? 1 : 0.5)).current;
+  const bubbleOpacity = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
+  const iconScale = useRef(new Animated.Value(isFocused ? 1.1 : 1)).current;
 
-  function animateIn() {
+  useEffect(() => {
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1.18, useNativeDriver: true, speed: 40, bounciness: 8 }),
-      Animated.timing(glowAnim,  { toValue: 1,    useNativeDriver: false, duration: 120 }),
+      Animated.spring(bubbleScale, {
+        toValue: isFocused ? 1 : 0.5,
+        speed: 18,
+        bounciness: 10,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
+      Animated.timing(bubbleOpacity, {
+        toValue: isFocused ? 1 : 0,
+        duration: 150,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
+      Animated.spring(iconScale, {
+        toValue: isFocused ? 1.14 : 1,
+        speed: 18,
+        bounciness: 8,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
     ]).start();
-  }
+  }, [bubbleOpacity, bubbleScale, iconScale, isFocused]);
 
-  function animateOut() {
-    Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 4 }),
-      Animated.timing(glowAnim,  { toValue: 0, useNativeDriver: false, duration: 150 }),
-    ]).start();
-  }
-
-  function animatePress() {
+  function handlePress() {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     Animated.sequence([
-      Animated.spring(scaleAnim, { toValue: 0.84, useNativeDriver: true, speed: 60, bounciness: 0 }),
-      Animated.spring(scaleAnim, { toValue: 1,    useNativeDriver: true, speed: 30, bounciness: 8 }),
+      Animated.spring(pressScale, {
+        toValue: 0.78,
+        speed: 200,
+        bounciness: 0,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
+      Animated.spring(pressScale, {
+        toValue: 1,
+        speed: 12,
+        bounciness: 18,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
     ]).start();
+    onPress();
   }
-
-  // Interpolate hover glow background opacity
-  const hoverBg = glowAnim.interpolate({
-    inputRange:  [0, 1],
-    outputRange: [
-      isFocused ? colors.primary + '28' : 'rgba(255,255,255,0)',
-      isFocused ? colors.primary + '45' : 'rgba(255,255,255,0.14)',
-    ],
-  });
 
   const iconColor = isFocused ? colors.primary : colors.mutedForeground;
 
   return (
     <Pressable
       key={route.key}
-      onPress={() => { animatePress(); onPress(); }}
-      onHoverIn={() => { if (Platform.OS === 'web') animateIn(); }}
-      onHoverOut={() => { if (Platform.OS === 'web') animateOut(); }}
-      onPressIn={() => { if (Platform.OS !== 'web') animateIn(); }}
-      onPressOut={() => { if (Platform.OS !== 'web') animateOut(); }}
       style={styles.tabBtn}
+      onPress={handlePress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
     >
-      <Animated.View
-        style={[
-          styles.tabBtnInner,
-          { backgroundColor: hoverBg, transform: [{ scale: scaleAnim }] },
-        ]}
-      >
-        {Platform.OS === 'ios' ? (
-          <SymbolView
-            name={tab.sf as any}
-            tintColor={iconColor}
-            size={21}
-          />
-        ) : (
-          <Feather name={tab.icon} size={20} color={iconColor} />
-        )}
+      <Animated.View style={[styles.tabBtnInner, { transform: [{ scale: pressScale }] }]}>
+        <Animated.View
+          style={[
+            styles.bubble,
+            {
+              opacity: bubbleOpacity,
+              transform: [{ scale: bubbleScale }],
+              backgroundColor: colors.primary + '1F',
+              borderColor: colors.primary + '47',
+            },
+          ]}
+        />
+        <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+          {Platform.OS === 'ios' ? (
+            <SymbolView name={tab.sf as any} tintColor={iconColor} size={21} />
+          ) : (
+            <Feather name={tab.icon} size={20} color={iconColor} />
+          )}
+        </Animated.View>
         {isFocused && (
           <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
         )}
@@ -122,14 +145,22 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
     }),
   };
 
-  function onPillHoverIn() {
-    if (Platform.OS !== 'web') return;
-    Animated.spring(pillLift, { toValue: 1, useNativeDriver: false, speed: 28, bounciness: 6 }).start();
+  function liftPill() {
+    Animated.spring(pillLift, {
+      toValue: 1,
+      useNativeDriver: false,
+      speed: 28,
+      bounciness: 6,
+    }).start();
   }
 
-  function onPillHoverOut() {
-    if (Platform.OS !== 'web') return;
-    Animated.spring(pillLift, { toValue: 0, useNativeDriver: false, speed: 28, bounciness: 4 }).start();
+  function dropPill() {
+    Animated.spring(pillLift, {
+      toValue: 0,
+      useNativeDriver: false,
+      speed: 28,
+      bounciness: 4,
+    }).start();
   }
 
   if (!hasOnboarded) return null;
@@ -139,41 +170,42 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
       <View style={[styles.glow, { shadowColor: colors.primary }]} pointerEvents="none" />
 
       <View
-        // @ts-expect-error web-only hover on the floating pill
-        onMouseEnter={onPillHoverIn}
-        onMouseLeave={onPillHoverOut}
+        // @ts-expect-error web-only hover lifts the whole pill
+        onMouseEnter={Platform.OS === 'web' ? liftPill : undefined}
+        onMouseLeave={Platform.OS === 'web' ? dropPill : undefined}
       >
-        <Animated.View style={[styles.pillShadow, Platform.OS === 'web' ? pillHoverStyle : undefined]}>
-        <BlurView intensity={55} tint="dark" style={styles.blurPill}>
-          <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
-            {state.routes.map((route: any, index: number) => {
-              const isFocused = state.index === index;
+        <Animated.View style={[styles.pillShadow, pillHoverStyle]}>
+          <BlurView intensity={55} tint="dark" style={styles.blurPill}>
+            <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
+              {state.routes.map((route: any, index: number) => {
+                const isFocused = state.index === index;
 
-              function onPress() {
-                Haptics.selectionAsync();
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!isFocused && !event.defaultPrevented) {
-                  navigation.navigate(route.name);
+                function onPress() {
+                  const event = navigation.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
+                  if (!isFocused && !event.defaultPrevented) {
+                    navigation.navigate(route.name);
+                  }
                 }
-              }
 
-              return (
-                <TabButton
-                  key={route.key}
-                  route={route}
-                  index={index}
-                  isFocused={isFocused}
-                  colors={colors}
-                  onPress={onPress}
-                />
-              );
-            })}
-          </View>
-        </BlurView>
+                return (
+                  <TabButton
+                    key={route.key}
+                    route={route}
+                    index={index}
+                    isFocused={isFocused}
+                    colors={colors}
+                    onPress={onPress}
+                    onPressIn={Platform.OS !== 'web' ? liftPill : undefined}
+                    onPressOut={Platform.OS !== 'web' ? dropPill : undefined}
+                  />
+                );
+              })}
+            </View>
+          </BlurView>
         </Animated.View>
       </View>
     </View>
@@ -233,21 +265,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 4,
   },
-  // Outer touchable — sized for hit area
   tabBtn: {
     width: 58,
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Inner animated view — sized the same, renders the visual
   tabBtnInner: {
     width: 58,
     height: 50,
-    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+  },
+  bubble: {
+    position: 'absolute',
+    width: 50,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   activeDot: {
     width: 4,
