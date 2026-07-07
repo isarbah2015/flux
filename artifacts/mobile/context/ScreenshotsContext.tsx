@@ -171,10 +171,18 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     void (async () => {
-      await initLocalDb();
-      const rows = await getAllLocalScreenshots();
-      setLocalScreenshots(rows);
-      setLocalReady(true);
+      try {
+        await initLocalDb();
+        const rows = await getAllLocalScreenshots();
+        setLocalScreenshots(rows);
+      } catch (err) {
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.warn('[Flux] local DB unavailable — continuing without on-device store:', err);
+        }
+      } finally {
+        setLocalReady(true);
+      }
     })();
   }, []);
 
