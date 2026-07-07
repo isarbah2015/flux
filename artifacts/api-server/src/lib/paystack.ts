@@ -1,12 +1,16 @@
 /**
- * Paystack billing helpers for Flux Premium ($9.99/mo).
+ * Paystack billing helpers for Flux Premium (₵99/mo GHS).
+ * Same Paystack account as ScoutGrid — keys in Firebase Secret Manager.
  * Docs: https://paystack.com/docs/api/
  */
 import { createHmac } from "node:crypto";
 
 const PAYSTACK_BASE = "https://api.paystack.co";
 
-export const PREMIUM_AMOUNT_CENTS = 999; // $9.99 USD
+/** ₵99.00 in pesewas (GHS subunit — same as ScoutGrid). */
+export const PREMIUM_AMOUNT_PESEWAS = 9900;
+export const PREMIUM_AMOUNT_GHS = 99;
+export const PREMIUM_CURRENCY = "GHS" as const;
 export const PREMIUM_PLAN_LABEL = "Flux Premium";
 
 function secretKey(): string {
@@ -65,8 +69,9 @@ export async function initializePremiumPayment(opts: {
     method: "POST",
     body: JSON.stringify({
       email: opts.email,
-      amount: PREMIUM_AMOUNT_CENTS,
-      currency: "USD",
+      amount: PREMIUM_AMOUNT_PESEWAS,
+      currency: PREMIUM_CURRENCY,
+      channels: ["card", "mobile_money", "bank"],
       reference,
       callback_url: opts.callbackUrl,
       metadata: {

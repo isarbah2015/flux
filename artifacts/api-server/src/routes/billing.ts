@@ -8,7 +8,9 @@ import {
   isPaystackConfigured,
   verifyTransaction,
   verifyWebhookSignature,
-  PREMIUM_AMOUNT_CENTS,
+  PREMIUM_AMOUNT_PESEWAS,
+  PREMIUM_AMOUNT_GHS,
+  PREMIUM_CURRENCY,
 } from "../lib/paystack";
 
 const router: IRouter = Router();
@@ -70,7 +72,8 @@ router.get("/billing/status", requireAuth, async (req, res) => {
     isPremium: active,
     plan: active ? "premium" : "free",
     premiumUntil: sub.premiumUntil?.toISOString() ?? null,
-    priceUsd: "9.99",
+    priceGhs: String(PREMIUM_AMOUNT_GHS),
+    currency: PREMIUM_CURRENCY,
     paystackConfigured: isPaystackConfigured(),
   });
 });
@@ -98,8 +101,8 @@ router.post("/billing/initialize", requireAuth, async (req, res) => {
       authorizationUrl: result.authorizationUrl,
       accessCode: result.accessCode,
       reference: result.reference,
-      amount: PREMIUM_AMOUNT_CENTS,
-      currency: "USD",
+      amount: PREMIUM_AMOUNT_PESEWAS,
+      currency: PREMIUM_CURRENCY,
     });
   } catch (err) {
     logger.error({ err }, "Paystack initialize failed");

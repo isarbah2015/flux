@@ -34,7 +34,8 @@ const DEFAULT_STATUS: BillingStatus = {
   isPremium: false,
   plan: 'free',
   premiumUntil: null,
-  priceUsd: '9.99',
+  priceGhs: '99',
+  currency: 'GHS',
   paystackConfigured: false,
 };
 

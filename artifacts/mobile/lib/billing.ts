@@ -5,7 +5,8 @@ export interface BillingStatus {
   isPremium: boolean;
   plan: 'free' | 'premium';
   premiumUntil: string | null;
-  priceUsd: string;
+  priceGhs: string;
+  currency: string;
   paystackConfigured: boolean;
 }
 
