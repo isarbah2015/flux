@@ -73,8 +73,7 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.629513991075-3cveb0kbok06hn5g2eccleo4b34pche3"
         }
-      ],
-      "./plugins/with-ndk-version.js"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
