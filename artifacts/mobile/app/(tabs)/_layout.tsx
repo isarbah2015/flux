@@ -36,7 +36,7 @@ function TabButton({
 
   function animateIn() {
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1.13, useNativeDriver: true, speed: 40, bounciness: 6 }),
+      Animated.spring(scaleAnim, { toValue: 1.18, useNativeDriver: true, speed: 40, bounciness: 8 }),
       Animated.timing(glowAnim,  { toValue: 1,    useNativeDriver: false, duration: 120 }),
     ]).start();
   }
@@ -72,6 +72,8 @@ function TabButton({
       onPress={() => { animatePress(); onPress(); }}
       onHoverIn={() => { if (Platform.OS === 'web') animateIn(); }}
       onHoverOut={() => { if (Platform.OS === 'web') animateOut(); }}
+      onPressIn={() => { if (Platform.OS !== 'web') animateIn(); }}
+      onPressOut={() => { if (Platform.OS !== 'web') animateOut(); }}
       style={styles.tabBtn}
     >
       <Animated.View
@@ -101,8 +103,34 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { hasOnboarded } = useScreenshots();
+  const pillLift = useRef(new Animated.Value(0)).current;
 
   const bottom = Platform.OS === 'web' ? 14 : Math.max(insets.bottom, 6);
+
+  const pillHoverStyle = {
+    transform: [
+      {
+        translateY: pillLift.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -6],
+        }),
+      },
+    ],
+    shadowOpacity: pillLift.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.55, 0.75],
+    }),
+  };
+
+  function onPillHoverIn() {
+    if (Platform.OS !== 'web') return;
+    Animated.spring(pillLift, { toValue: 1, useNativeDriver: false, speed: 28, bounciness: 6 }).start();
+  }
+
+  function onPillHoverOut() {
+    if (Platform.OS !== 'web') return;
+    Animated.spring(pillLift, { toValue: 0, useNativeDriver: false, speed: 28, bounciness: 4 }).start();
+  }
 
   if (!hasOnboarded) return null;
 
@@ -110,7 +138,12 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
     <View style={[styles.wrapper, { bottom: bottom + 6 }]} pointerEvents="box-none">
       <View style={[styles.glow, { shadowColor: colors.primary }]} pointerEvents="none" />
 
-      <View style={styles.pillShadow}>
+      <View
+        // @ts-expect-error web-only hover on the floating pill
+        onMouseEnter={onPillHoverIn}
+        onMouseLeave={onPillHoverOut}
+      >
+        <Animated.View style={[styles.pillShadow, Platform.OS === 'web' ? pillHoverStyle : undefined]}>
         <BlurView intensity={55} tint="dark" style={styles.blurPill}>
           <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
             {state.routes.map((route: any, index: number) => {
@@ -141,6 +174,7 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
             })}
           </View>
         </BlurView>
+        </Animated.View>
       </View>
     </View>
   );

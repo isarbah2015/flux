@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ScreenshotsProvider } from '@/context/ScreenshotsContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { PremiumProvider } from '@/context/PremiumContext';
 import LoginScreen from '@/components/LoginScreen';
 import {
   DMSans_400Regular,
@@ -79,15 +80,17 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <ScreenshotsProvider>
-              <GestureHandlerRootView>
-                <KeyboardProvider>
-                  <AuthGate>
-                    <RootLayoutNav />
-                  </AuthGate>
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </ScreenshotsProvider>
+            <PremiumProvider>
+              <ScreenshotsProvider>
+                <GestureHandlerRootView>
+                  <KeyboardProvider>
+                    <AuthGate>
+                      <RootLayoutNav />
+                    </AuthGate>
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </ScreenshotsProvider>
+            </PremiumProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>

@@ -14,6 +14,12 @@ import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from '@/constants/co
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import {
+  addToCalendar,
+  openProductDeal,
+  setPromiseReminder,
+  shareScreenshot,
+} from '@/lib/actions';
 
 export default function ScreenshotDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -60,6 +66,7 @@ export default function ScreenshotDetail() {
           <Text style={[styles.catChipText, { color: catColor }]}>{catLabel.toUpperCase()}</Text>
         </View>
         <Pressable
+          onPress={() => { void shareScreenshot(screenshot); }}
           style={({ pressed }) => [
             styles.backBtn,
             { backgroundColor: colors.secondary, opacity: pressed ? 0.7 : 1 },
@@ -132,7 +139,12 @@ export default function ScreenshotDetail() {
                 </View>
               )}
             </View>
-            <SmartBtn color="#FF9F0A" label="View Deal" icon="external-link" />
+            <SmartBtn
+              color="#FF9F0A"
+              label="View Deal"
+              icon="external-link"
+              onPress={() => { void openProductDeal(screenshot); }}
+            />
           </SmartBlock>
         )}
 
@@ -150,7 +162,12 @@ export default function ScreenshotDetail() {
                 Due: {screenshot.promise.deadline}
               </Text>
             </View>
-            <SmartBtn color="#FF375F" label="Set Reminder" icon="bell" />
+            <SmartBtn
+              color="#FF375F"
+              label="Set Reminder"
+              icon="bell"
+              onPress={() => { void setPromiseReminder(screenshot); }}
+            />
           </SmartBlock>
         )}
 
@@ -171,7 +188,13 @@ export default function ScreenshotDetail() {
                 </Text>
               </View>
             )}
-            <SmartBtn color="#00D4FF" label="Add to Calendar" icon="plus" dark />
+            <SmartBtn
+              color="#00D4FF"
+              label="Add to Calendar"
+              icon="plus"
+              dark
+              onPress={() => { void addToCalendar(screenshot); }}
+            />
           </SmartBlock>
         )}
 
@@ -211,13 +234,16 @@ function SmartBlock({
 }
 
 function SmartBtn({
-  color, label, icon, dark,
+  color, label, icon, dark, onPress,
 }: {
-  color: string; label: string; icon: string; dark?: boolean;
+  color: string; label: string; icon: string; dark?: boolean; onPress?: () => void;
 }) {
   return (
     <Pressable
-      onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress?.();
+      }}
       style={({ pressed }) => [
         styles.smartBtn,
         { backgroundColor: color, opacity: pressed ? 0.85 : 1 },

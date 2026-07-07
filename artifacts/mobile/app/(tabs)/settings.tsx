@@ -1,5 +1,7 @@
 import React from 'react';
 import {
+  ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -7,11 +9,19 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useScreenshots } from '@/context/ScreenshotsContext';
 import { useAuth } from '@/context/AuthContext';
+import { usePremium } from '@/context/PremiumContext';
+import {
+  openPrivacyPolicy,
+  sendFeedback,
+  showProfileInfo,
+} from '@/lib/actions';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 interface RowProps {
   icon: string;
@@ -33,11 +43,11 @@ function Row({ icon, iconColor, label, value, onPress, destructive, last }: RowP
       style={({ pressed }) => [
         styles.row,
         !last && { borderBottomWidth: 1, borderBottomColor: colors.border + '55' },
-        { opacity: pressed ? 0.7 : 1 },
+        { opacity: pressed && onPress ? 0.7 : 1 },
       ]}
     >
       <View style={[styles.rowIcon, { backgroundColor: ic + '20' }]}>
-        <Feather name={icon as any} size={15} color={ic} />
+        <Feather name={icon as keyof typeof Feather.glyphMap} size={15} color={ic} />
       </View>
       <Text style={[styles.rowLabel, { color: destructive ? colors.destructive : colors.foreground }]}>
         {label}
@@ -57,11 +67,7 @@ function SectionLabel({ title }: { title: string }) {
 
 function Group({ children }: { children: React.ReactNode }) {
   const colors = useColors();
-  return (
-    <View style={[styles.group, { backgroundColor: colors.card }]}>
-      {children}
-    </View>
-  );
+  return <View style={[styles.group, { backgroundColor: colors.card }]}>{children}</View>;
 }
 
 export default function SettingsScreen() {
@@ -69,9 +75,19 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { totalIndexed } = useScreenshots();
   const { authEnabled, user, signOut } = useAuth();
+  const { isPremium, isCheckingOut, paystackConfigured, startCheckout, refresh } = usePremium();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
+
+  async function handlePremium() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (isPremium) {
+      await refresh();
+      return;
+    }
+    await startCheckout();
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -79,54 +95,46 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: botPad }}
         showsVerticalScrollIndicator={false}
       >
-
-        {/* ── Profile card ── */}
         <SectionLabel title="PROFILE" />
         <Pressable
+          onPress={() => showProfileInfo(user?.email)}
           style={({ pressed }) => [
             styles.profileCard,
             { backgroundColor: colors.card, opacity: pressed ? 0.85 : 1 },
           ]}
         >
-          {/* Avatar */}
           <View style={[styles.avatar, { backgroundColor: colors.primary + '28' }]}>
             <Feather name="user" size={26} color={colors.primary} />
           </View>
-
-          {/* Info */}
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>
               {user?.email ?? 'Flux User'}
             </Text>
-            <View style={[styles.planBadge, { backgroundColor: colors.secondary }]}>
-              <View style={[styles.planDot, { backgroundColor: '#30D158' }]} />
-              <Text style={[styles.planText, { color: colors.mutedForeground }]}>Free Plan</Text>
+            <View style={[styles.planBadge, { backgroundColor: isPremium ? colors.primary + '22' : colors.secondary }]}>
+              <View style={[styles.planDot, { backgroundColor: isPremium ? colors.primary : '#30D158' }]} />
+              <Text style={[styles.planText, { color: isPremium ? colors.primary : colors.mutedForeground }]}>
+                {isPremium ? 'Premium' : 'Free Plan'}
+              </Text>
             </View>
           </View>
-
-          {/* Edit arrow */}
           <View style={[styles.editBtn, { backgroundColor: colors.secondary }]}>
             <Feather name="edit-2" size={14} color={colors.mutedForeground} />
           </View>
         </Pressable>
 
-        {/* ── App branding ── */}
         <View style={styles.appHeader}>
-          <View style={[styles.appIcon, { backgroundColor: colors.primary + '20' }]}>
-            <Feather name="zap" size={30} color={colors.primary} />
-          </View>
+          <Image source={require('@/assets/images/icon.png')} style={styles.appIconImg} />
           <Text style={[styles.appName, { color: colors.foreground }]}>Flux</Text>
           <Text style={[styles.appTagline, { color: colors.mutedForeground }]}>
             Your screenshots, alive.
           </Text>
         </View>
 
-        {/* Stats row */}
         <View style={styles.statsRow}>
           {[
-            { val: String(totalIndexed), lbl: 'Indexed',    color: colors.primary  },
-            { val: '100%',              lbl: 'On-device',   color: '#30D158'       },
-            { val: '0',                 lbl: 'Cloud calls', color: '#FF9F0A'       },
+            { val: String(totalIndexed), lbl: 'Indexed', color: colors.primary },
+            { val: isPremium ? 'Pro' : 'Free', lbl: 'Plan', color: isPremium ? '#FFD60A' : '#30D158' },
+            { val: 'Secure', lbl: 'Firebase', color: '#00D4FF' },
           ].map(({ val, lbl, color }) => (
             <View key={lbl} style={[styles.statCard, { backgroundColor: color + '14' }]}>
               <Text style={[styles.statVal, { color }]}>{val}</Text>
@@ -135,31 +143,37 @@ export default function SettingsScreen() {
           ))}
         </View>
 
-        {/* Privacy */}
         <SectionLabel title="PRIVACY" />
         <Group>
-          <Row icon="shield"    iconColor="#30D158" label="On-device processing" value="Always on" />
-          <Row icon="cloud-off" iconColor="#30D158" label="Cloud sync"           value="Disabled"  />
-          <Row icon="eye-off"   iconColor="#30D158" label="Analytics"            value="Disabled"  last />
+          <Row icon="shield" iconColor="#30D158" label="Encrypted in transit" value="TLS" />
+          <Row icon="lock" iconColor="#30D158" label="Firebase Auth" value="Active" />
+          <Row icon="eye-off" iconColor="#30D158" label="Analytics" value="Disabled" last />
         </Group>
 
-        {/* Storage */}
         <SectionLabel title="STORAGE" />
         <Group>
-          <Row icon="database"   iconColor={colors.primary} label="Indexed screenshots" value={String(totalIndexed)} />
-          <Row icon="hard-drive" iconColor={colors.primary} label="Local storage"       value="4.2 MB" last />
+          <Row icon="database" iconColor={colors.primary} label="Indexed screenshots" value={String(totalIndexed)} />
+          <Row icon="hard-drive" iconColor={colors.primary} label="Local cache" value="On device" last />
         </Group>
 
-        {/* Premium */}
         <SectionLabel title="PREMIUM" />
-        <View style={[styles.premiumCard, { backgroundColor: colors.primary + '12' }]}>
+        <LinearGradient
+          colors={[colors.primary + '30', colors.accent + '18', colors.card]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.premiumCard, { borderColor: colors.primary + '35' }]}
+        >
           <View style={styles.premiumTop}>
-            <View style={[styles.premiumIcon, { backgroundColor: colors.primary + '22' }]}>
+            <View style={[styles.premiumIcon, { backgroundColor: colors.primary + '30' }]}>
               <Feather name="star" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.premiumTitle, { color: colors.foreground }]}>Flux Premium</Text>
-              <Text style={[styles.premiumPrice, { color: colors.primary }]}>$9.99 / month</Text>
+              <Text style={[styles.premiumTitle, { color: colors.foreground }]}>
+                {isPremium ? 'Flux Premium Active' : 'Flux Premium'}
+              </Text>
+              <Text style={[styles.premiumPrice, { color: colors.primary }]}>
+                {isPremium ? 'Thank you for supporting Flux' : '$9.99 / month via Paystack'}
+              </Text>
             </View>
           </View>
           <Text style={[styles.premiumDesc, { color: colors.mutedForeground }]}>
@@ -174,17 +188,30 @@ export default function SettingsScreen() {
             ))}
           </View>
           <Pressable
-            style={({ pressed }) => [
-              styles.premiumBtn,
-              { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
-            ]}
+            onPress={() => { void handlePremium(); }}
+            disabled={isCheckingOut}
+            style={({ pressed }) => [styles.premiumBtn, { opacity: pressed || isCheckingOut ? 0.85 : 1 }]}
           >
-            <Text style={styles.premiumBtnText}>Start Free Trial</Text>
-            <Feather name="arrow-right" size={16} color="#fff" />
+            <LinearGradient
+              colors={isPremium ? ['#30D158', '#28A745'] : [colors.primary, '#9B8FFF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.premiumBtnGrad}
+            >
+              {isCheckingOut ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.premiumBtnText}>
+                    {isPremium ? 'Premium Active' : paystackConfigured ? 'Upgrade with Paystack' : 'Set up Paystack'}
+                  </Text>
+                  <Feather name={isPremium ? 'check' : 'arrow-right'} size={16} color="#fff" />
+                </>
+              )}
+            </LinearGradient>
           </Pressable>
-        </View>
+        </LinearGradient>
 
-        {/* Account */}
         {authEnabled && (
           <>
             <SectionLabel title="ACCOUNT" />
@@ -201,14 +228,12 @@ export default function SettingsScreen() {
           </>
         )}
 
-        {/* About */}
         <SectionLabel title="ABOUT" />
         <Group>
-          <Row icon="info"           label="Version"         value="1.0.0" />
-          <Row icon="file-text"      label="Privacy Policy"  onPress={() => {}} />
-          <Row icon="message-square" label="Send Feedback"   onPress={() => {}} last />
+          <Row icon="info" label="Version" value="1.0.0" />
+          <Row icon="file-text" label="Privacy Policy" onPress={openPrivacyPolicy} />
+          <Row icon="message-square" label="Send Feedback" onPress={() => sendFeedback(user?.email)} last />
         </Group>
-
       </ScrollView>
     </View>
   );
@@ -216,8 +241,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
-  // Profile
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -256,38 +279,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-
-  // App header
-  appHeader: { alignItems: 'center', paddingVertical: 20, gap: 8 },
-  appIcon: {
-    width: 76,
-    height: 76,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
+  appHeader: { alignItems: 'center', paddingVertical: 16, gap: 8 },
+  appIconImg: { width: 76, height: 76, borderRadius: 22, marginBottom: 4 },
   appName: { fontSize: 26, fontFamily: 'DMSans_700Bold', letterSpacing: -0.5 },
   appTagline: { fontSize: 14, fontFamily: 'DMSans_400Regular' },
-
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginHorizontal: 20,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
-    gap: 3,
-  },
-  statVal: { fontSize: 20, fontFamily: 'DMSans_700Bold' },
+  statsRow: { flexDirection: 'row', gap: 10, marginHorizontal: 20, marginBottom: 24 },
+  statCard: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 16, gap: 3 },
+  statVal: { fontSize: 18, fontFamily: 'DMSans_700Bold' },
   statLbl: { fontSize: 11, fontFamily: 'DMSans_400Regular' },
-
-  // Section
   sectionLabel: {
     fontSize: 11,
     fontFamily: 'DMSans_600SemiBold',
@@ -297,32 +296,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 4,
   },
-  group: {
-    marginHorizontal: 20,
-    borderRadius: 18,
-    marginBottom: 22,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
+  group: { marginHorizontal: 20, borderRadius: 18, marginBottom: 22, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   rowIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { flex: 1, fontSize: 15, fontFamily: 'DMSans_400Regular' },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rowValue: { fontSize: 14, fontFamily: 'DMSans_400Regular' },
-
-  // Premium
-  premiumCard: {
-    marginHorizontal: 20,
-    borderRadius: 20,
-    padding: 18,
-    gap: 12,
-    marginBottom: 22,
-  },
+  premiumCard: { marginHorizontal: 20, borderRadius: 20, padding: 18, gap: 12, marginBottom: 22, borderWidth: 1 },
   premiumTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   premiumIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   premiumTitle: { fontSize: 16, fontFamily: 'DMSans_700Bold' },
@@ -332,14 +312,13 @@ const styles = StyleSheet.create({
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkDot: { width: 6, height: 6, borderRadius: 3 },
   featureText: { fontSize: 14, fontFamily: 'DMSans_500Medium' },
-  premiumBtn: {
+  premiumBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 2 },
+  premiumBtnGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 15,
-    borderRadius: 14,
-    marginTop: 2,
   },
   premiumBtnText: { color: '#fff', fontSize: 16, fontFamily: 'DMSans_700Bold' },
 });

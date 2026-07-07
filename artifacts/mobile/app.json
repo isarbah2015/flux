@@ -9,14 +9,22 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0C0C14"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.flux.screenshotos",
+      "icon": "./assets/images/icon.png"
     },
-    "android": {},
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#0C0C14"
+      },
+      "package": "com.flux.screenshotos"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
