@@ -5,17 +5,29 @@ A mobile-first AI screenshot intelligence engine. Flux automatically processes s
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port from `$PORT`, typically 8080)
-- `pnpm --filter @workspace/mobile run dev` — run the Expo mobile app
+- `pnpm --filter @workspace/mobile run dev` — run the Expo mobile app (Replit)
+- `pnpm --filter @workspace/mobile run dev:local` — run Expo locally on your Mac (no Replit env vars needed)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes to dev database (dev only)
+- `USER_ID=<firebase-uid> pnpm --filter @workspace/api-server run seed` — seed 10 demo screenshots for a user (skips if they already have data)
 
 ## Required Environment
 
 - `DATABASE_URL` — Postgres connection string (auto-provided by Replit's built-in PostgreSQL; also available as `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`)
 - `PORT` — injected automatically by Replit workflows; hard-required at API startup
 - `SESSION_SECRET` — secret for session signing (set in Replit Secrets)
+- `FIREBASE_PROJECT_ID` — Firebase project id (`flux-screenshotos`) to enforce per-user JWT auth on screenshot routes. Leave unset for local no-auth dev mode.
+- Mobile `EXPO_PUBLIC_FIREBASE_*` — web config from Firebase console / `firebase apps:sdkconfig WEB`. When set, the app shows a login gate and sends `Authorization: Bearer` on API calls.
+
+## Firebase Auth
+
+- **Project:** `flux-screenshotos` ([console](https://console.firebase.google.com/project/flux-screenshotos/authentication))
+- **Providers:** Email/password (deployed via `firebase deploy --only auth`)
+- **Config files:** `firebase.json`, `.firebaserc` at repo root
+- **Secrets:** copy `artifacts/mobile/.env.example` → `.env` and `artifacts/api-server/.env.example` → `.env`, then fill Firebase values (already done locally; `.env` is gitignored)
+- **Local dev without auth:** leave all Firebase env vars unset on both mobile and API — mobile skips login, API uses `local-dev` user id
 
 ## Stack
 

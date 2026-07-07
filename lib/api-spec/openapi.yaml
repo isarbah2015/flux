@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: screenshots
+    description: Screenshot intelligence operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /screenshots:
+    get:
+      operationId: getScreenshots
+      tags: [screenshots]
+      summary: List screenshots
+      description: Returns the screenshot library, optionally filtered by category or a text query.
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: Filter to a single category.
+          schema:
+            $ref: "#/components/schemas/Category"
+        - name: q
+          in: query
+          required: false
+          description: Full-text query matched against extracted text, summary, and tags.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The matching screenshots, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Screenshot"
+    post:
+      operationId: createScreenshot
+      tags: [screenshots]
+      summary: Import a screenshot
+      description: >
+        Imports a screenshot and runs AI classification to tag its category and
+        extract structured intelligence (price tracking, promises, calendar events).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScreenshotInput"
+      responses:
+        "201":
+          description: The imported and classified screenshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Screenshot"
+  /screenshots/{id}:
+    get:
+      operationId: getScreenshot
+      tags: [screenshots]
+      summary: Get a screenshot
+      description: Returns a single screenshot by id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The screenshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Screenshot"
+        "404":
+          description: No screenshot with that id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +109,139 @@ components:
           type: string
       required:
         - status
-
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    Category:
+      type: string
+      enum:
+        - shopping
+        - work
+        - travel
+        - receipt
+        - conversation
+        - unknown
+    PriceTracking:
+      type: object
+      properties:
+        productName:
+          type: string
+        detectedPrice:
+          type: string
+        currentPrice:
+          type: string
+        retailer:
+          type: string
+        priceDropped:
+          type: boolean
+      required:
+        - productName
+        - detectedPrice
+        - currentPrice
+        - retailer
+        - priceDropped
+    Promise:
+      type: object
+      properties:
+        from:
+          type: string
+        content:
+          type: string
+        deadline:
+          type: string
+        followUpDate:
+          type: string
+      required:
+        - from
+        - content
+        - deadline
+        - followUpDate
+    CalendarEvent:
+      type: object
+      properties:
+        title:
+          type: string
+        date:
+          type: string
+        time:
+          type: string
+        location:
+          type: string
+      required:
+        - title
+        - date
+    ScreenshotMetadata:
+      type: object
+      properties:
+        priceTracking:
+          $ref: "#/components/schemas/PriceTracking"
+        promise:
+          $ref: "#/components/schemas/Promise"
+        calendarEvent:
+          $ref: "#/components/schemas/CalendarEvent"
+    Screenshot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        imageUri:
+          type: string
+          nullable: true
+        category:
+          $ref: "#/components/schemas/Category"
+        extractedText:
+          type: string
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        colorHex:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/ScreenshotMetadata"
+        capturedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - category
+        - extractedText
+        - summary
+        - tags
+        - colorHex
+        - metadata
+        - capturedAt
+        - createdAt
+    CreateScreenshotInput:
+      type: object
+      description: >
+        Provide `imageBase64` for server-side vision OCR + classification, and/or
+        `extractedText` for text-only classification. At least one should be set.
+      properties:
+        imageUri:
+          type: string
+          nullable: true
+          description: Local device URI or remote URL to display as the thumbnail.
+        imageBase64:
+          type: string
+          nullable: true
+          description: Base64-encoded image bytes (no data URI prefix) for vision OCR.
+        extractedText:
+          type: string
+          description: OCR'd or user-provided text used to classify the screenshot.
+        capturedAt:
+          type: string
+          format: date-time
+          description: When the screenshot was taken. Defaults to now.
+        category:
+          $ref: "#/components/schemas/Category"

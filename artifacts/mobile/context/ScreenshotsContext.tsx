@@ -1,5 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useGetScreenshots,
+  useCreateScreenshot,
+  getGetScreenshotsQueryKey,
+  type Screenshot as ApiScreenshot,
+} from '@workspace/api-client-react';
+import { useAuth } from '@/context/AuthContext';
 
 export type Category = 'shopping' | 'work' | 'travel' | 'receipt' | 'conversation' | 'unknown';
 
@@ -27,6 +35,7 @@ export interface CalendarEvent {
 
 export interface Screenshot {
   id: string;
+  imageUri?: string | null;
   capturedAt: string;
   category: Category;
   tags: string[];
@@ -52,16 +61,25 @@ export interface Insight {
   metadata: Record<string, string>;
 }
 
+export interface NewScreenshot {
+  extractedText?: string;
+  imageBase64?: string | null;
+  imageUri?: string | null;
+  category?: Category;
+}
+
 interface ScreenshotsContextType {
   screenshots: Screenshot[];
-  isProcessing: boolean;
-  processingProgress: number;
+  isImporting: boolean;
   hasOnboarded: boolean;
   isLoading: boolean;
+  error: unknown;
   activeCategory: Category | 'all';
   setActiveCategory: (cat: Category | 'all') => void;
   filteredScreenshots: Screenshot[];
   completeOnboarding: () => void;
+  addScreenshot: (input: NewScreenshot) => Promise<Screenshot>;
+  refresh: () => void;
   searchScreenshots: (query: string) => Screenshot[];
   getInsights: () => Insight[];
   getScreenshot: (id: string) => Screenshot | undefined;
@@ -70,200 +88,83 @@ interface ScreenshotsContextType {
 
 const ScreenshotsContext = createContext<ScreenshotsContextType | null>(null);
 
-const now = Date.now();
+const ONBOARDED_KEY = 'flux_has_onboarded';
 const day = 86400000;
 
-const MOCK_DATA: Screenshot[] = [
-  {
-    id: '1',
-    capturedAt: new Date(now - 2 * 3600000).toISOString(),
-    category: 'shopping',
-    tags: ['sneakers', 'nike', 'price-tracked'],
-    extractedText:
-      'Nike Air Max 270\n$129.99\nSize: 10\n4.7 ★ (2,341 reviews)\nFree 2-day delivery\nAdd to Cart',
-    summary: 'Nike Air Max 270 at $129.99 — price dropped from $149.99',
-    colorHex: '#FF9F0A',
-    priceTracking: {
-      productName: 'Nike Air Max 270',
-      detectedPrice: '$149.99',
-      currentPrice: '$119.99',
-      retailer: 'Amazon',
-      priceDropped: true,
-    },
-  },
-  {
-    id: '2',
-    capturedAt: new Date(now - 5 * 3600000).toISOString(),
-    category: 'travel',
-    tags: ['flight', 'calendar-added', 'delta'],
-    extractedText:
-      'Booking Confirmed\nDelta Flight DL 4821\nNew York JFK → Los Angeles LAX\nJuly 15, 2026 | 8:30 AM\nGate B27 | Seat 14A\nConfirmation: XKDF92',
-    summary: 'Delta DL4821 JFK→LAX on July 15 at 8:30 AM, Gate B27',
-    colorHex: '#00D4FF',
-    calendarEvent: {
-      title: 'Flight DL4821 JFK→LAX',
-      date: '2026-07-15',
-      time: '8:30 AM',
-      location: 'JFK Airport, Gate B27',
-    },
-  },
-  {
-    id: '3',
-    capturedAt: new Date(now - day).toISOString(),
-    category: 'conversation',
-    tags: ['promise', 'money', 'follow-up'],
-    extractedText:
-      "Sarah M.\n\"Hey, I'll send you the $500 for the trip by this Friday. Promise! 🤞\"\nToday 2:34 PM",
-    summary: 'Sarah promised $500 by Friday',
-    colorHex: '#FF375F',
-    promise: {
-      from: 'Sarah M.',
-      content: 'Send $500 for the trip',
-      deadline: 'Friday',
-      followUpDate: new Date(now + 3 * day).toISOString(),
-    },
-  },
-  {
-    id: '4',
-    capturedAt: new Date(now - 2 * day).toISOString(),
-    category: 'work',
-    tags: ['meeting', 'whiteboard', 'action-items'],
-    extractedText:
-      'Q3 Roadmap Whiteboard\n\n✓ Launch v2 by Aug 1\n✓ Hire 2 engineers\n□ Close $2M seed round\n□ Reach 10K MAU\n□ Partner with Notion\n\nOwner: Alex\nDeadline: Sept 30',
-    summary: 'Q3 roadmap: v2 launch, seed round, 10K MAU by Sept 30',
-    colorHex: '#7C72FF',
-  },
-  {
-    id: '5',
-    capturedAt: new Date(now - 3 * day).toISOString(),
-    category: 'receipt',
-    tags: ['whole-foods', 'grocery'],
-    extractedText:
-      'WHOLE FOODS MARKET\n06/28/2026 10:42 AM\n\nOrganic Avocados 3pk    $6.99\nKombucha 16oz            $4.49\nAlmond Milk              $3.99\nFree-Range Eggs          $7.49\nSourdough Bread          $8.99\n\nSubtotal               $31.95\nTax (6%)                $1.92\nTOTAL                  $33.87',
-    summary: 'Whole Foods — $33.87 on June 28',
-    colorHex: '#30D158',
-  },
-  {
-    id: '6',
-    capturedAt: new Date(now - 4 * day).toISOString(),
-    category: 'shopping',
-    tags: ['airpods', 'apple', 'price-tracked'],
-    extractedText:
-      'AirPods Pro (2nd Gen)\nActive Noise Cancellation\n$249.00\nIn Stock · White\nFree shipping with Prime',
-    summary: 'AirPods Pro 2nd gen at $249 — watching for price drop',
-    colorHex: '#FF9F0A',
-    priceTracking: {
-      productName: 'AirPods Pro (2nd Gen)',
-      detectedPrice: '$249.00',
-      currentPrice: '$249.00',
-      retailer: 'Amazon',
-      priceDropped: false,
-    },
-  },
-  {
-    id: '7',
-    capturedAt: new Date(now - 5 * day).toISOString(),
-    category: 'conversation',
-    tags: ['promise', 'promotion', 'work'],
-    extractedText:
-      "Manager (James)\n\"You've been killing it this quarter. I'll make sure you get that promotion by end of Q3. Let's talk numbers next week.\"\nMonday 9:15 AM",
-    summary: 'James promised a promotion by end of Q3',
-    colorHex: '#FF375F',
-    promise: {
-      from: 'James (Manager)',
-      content: 'Promotion by end of Q3',
-      deadline: 'September 30',
-      followUpDate: new Date(now + 85 * day).toISOString(),
-    },
-  },
-  {
-    id: '8',
-    capturedAt: new Date(now - 6 * day).toISOString(),
-    category: 'travel',
-    tags: ['hotel', 'nyc', 'calendar-added'],
-    extractedText:
-      'Marriott Bonvoy\nReservation Confirmed\nNew York Marriott Marquis\nCheck-in: Aug 3, 2026\nCheck-out: Aug 6, 2026\n3 nights · King Room\nRate: $289/night\nTotal: $919.87\nConf #: MAR-8471920',
-    summary: 'Marriott NYC Aug 3–6, 3 nights at $289/night',
-    colorHex: '#00D4FF',
-    calendarEvent: {
-      title: 'Hotel: Marriott Marquis NYC',
-      date: '2026-08-03',
-      time: 'Check-in 3:00 PM',
-      location: 'New York Marriott Marquis',
-    },
-  },
-  {
-    id: '9',
-    capturedAt: new Date(now - 7 * day).toISOString(),
-    category: 'work',
-    tags: ['slack', 'deadline', 'feature'],
-    extractedText:
-      '#eng-general\nTaylor: The new feature needs to ship by Friday EOD. Alex owns the API, Jordan owns the frontend. DM me if blocked.\n10:22 AM',
-    summary: 'Feature ships Friday — Alex: API, Jordan: frontend',
-    colorHex: '#7C72FF',
-  },
-  {
-    id: '10',
-    capturedAt: new Date(now - 10 * day).toISOString(),
-    category: 'unknown',
-    tags: ['plant', 'identified'],
-    extractedText:
-      'Philodendron Heartleaf\nLow maintenance · Thrives in indirect light\n⚠️ Toxic to cats and dogs\nWater: Every 1–2 weeks',
-    summary: 'Philodendron Heartleaf — toxic to cats and dogs',
-    colorHex: '#636384',
-  },
-];
-
-const STORAGE_KEY = 'flux_screenshots_v1';
-const ONBOARDED_KEY = 'flux_has_onboarded';
+/** Map the API screenshot shape onto the flattened shape the UI consumes. */
+function fromApi(s: ApiScreenshot): Screenshot {
+  return {
+    id: s.id,
+    imageUri: s.imageUri ?? null,
+    capturedAt: s.capturedAt,
+    category: s.category as Category,
+    tags: s.tags,
+    extractedText: s.extractedText,
+    summary: s.summary,
+    colorHex: s.colorHex,
+    priceTracking: s.metadata?.priceTracking,
+    promise: s.metadata?.promise,
+    calendarEvent: s.metadata?.calendarEvent,
+  };
+}
 
 export function ScreenshotsProvider({ children }: { children: React.ReactNode }) {
-  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState(0);
+  const queryClient = useQueryClient();
+  const { authEnabled, isReady: authReady, user } = useAuth();
   const [hasOnboarded, setHasOnboarded] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
+
+  // Fetch only once onboarded and (when auth is on) signed in.
+  const canFetch = hasOnboarded && (!authEnabled || (authReady && !!user));
 
   useEffect(() => {
     (async () => {
-      const [onboarded, stored] = await Promise.all([
-        AsyncStorage.getItem(ONBOARDED_KEY),
-        AsyncStorage.getItem(STORAGE_KEY),
-      ]);
-      if (onboarded === 'true') {
-        setHasOnboarded(true);
-        if (stored) {
-          setScreenshots(JSON.parse(stored));
-        } else {
-          setScreenshots(MOCK_DATA);
-        }
-      }
-      setIsLoading(false);
+      const onboarded = await AsyncStorage.getItem(ONBOARDED_KEY);
+      setHasOnboarded(onboarded === 'true');
+      setOnboardingChecked(true);
     })();
   }, []);
+
+  const query = useGetScreenshots(undefined, {
+    query: {
+      enabled: canFetch,
+      queryKey: getGetScreenshotsQueryKey(),
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+    },
+  });
+  const createMutation = useCreateScreenshot();
+
+  const screenshots = useMemo<Screenshot[]>(
+    () => (query.data ?? []).map(fromApi),
+    [query.data],
+  );
 
   const completeOnboarding = useCallback(async () => {
     setHasOnboarded(true);
     await AsyncStorage.setItem(ONBOARDED_KEY, 'true');
-    // Simulate processing animation
-    setIsProcessing(true);
-    setProcessingProgress(0);
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 12 + 4;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        setTimeout(() => {
-          setIsProcessing(false);
-          setScreenshots(MOCK_DATA);
-          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_DATA));
-        }, 400);
-      }
-      setProcessingProgress(Math.min(progress, 100));
-    }, 120);
   }, []);
+
+  const addScreenshot = useCallback(
+    async (input: NewScreenshot): Promise<Screenshot> => {
+      const created = await createMutation.mutateAsync({
+        data: {
+          extractedText: input.extractedText,
+          imageBase64: input.imageBase64 ?? null,
+          imageUri: input.imageUri ?? null,
+          category: input.category,
+        },
+      });
+      await queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
+      return fromApi(created);
+    },
+    [createMutation, queryClient],
+  );
+
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: getGetScreenshotsQueryKey() });
+  }, [queryClient]);
 
   const filteredScreenshots =
     activeCategory === 'all'
@@ -271,15 +172,15 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
       : screenshots.filter((s) => s.category === activeCategory);
 
   const searchScreenshots = useCallback(
-    (query: string): Screenshot[] => {
-      if (!query.trim()) return [];
-      const q = query.toLowerCase();
+    (q: string): Screenshot[] => {
+      if (!q.trim()) return [];
+      const needle = q.toLowerCase();
       return screenshots.filter(
         (s) =>
-          s.extractedText.toLowerCase().includes(q) ||
-          s.summary.toLowerCase().includes(q) ||
-          s.tags.some((t) => t.toLowerCase().includes(q)) ||
-          s.category.toLowerCase().includes(q),
+          s.extractedText.toLowerCase().includes(needle) ||
+          s.summary.toLowerCase().includes(needle) ||
+          s.tags.some((t) => t.toLowerCase().includes(needle)) ||
+          s.category.toLowerCase().includes(needle),
       );
     },
     [screenshots],
@@ -352,7 +253,6 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
         }
       }
     }
-    // urgent first
     return insights.sort((a, b) => Number(b.urgent) - Number(a.urgent));
   }, [screenshots]);
 
@@ -365,14 +265,21 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
     <ScreenshotsContext.Provider
       value={{
         screenshots,
-        isProcessing,
-        processingProgress,
+        isImporting: createMutation.isPending,
         hasOnboarded,
-        isLoading,
+        // Loading until onboarding + auth resolve, and while the first fetch runs.
+        // Skip the fetch spinner when onboarding hasn't completed — show slides instead.
+        isLoading:
+          !onboardingChecked ||
+          (authEnabled && !authReady) ||
+          (hasOnboarded && canFetch && query.isLoading && !query.data),
+        error: query.error,
         activeCategory,
         setActiveCategory,
         filteredScreenshots,
         completeOnboarding,
+        addScreenshot,
+        refresh,
         searchScreenshots,
         getInsights,
         getScreenshot,

@@ -13,7 +13,11 @@ import { useScreenshots, type Category, type Screenshot } from '@/context/Screen
 import ScreenshotCard from '@/components/ScreenshotCard';
 import CategoryPill from '@/components/CategoryPill';
 import OnboardingScreen from '@/components/OnboardingScreen';
+import LoadingScreen from '@/components/LoadingScreen';
 import { Feather } from '@expo/vector-icons';
+import { router, type Href } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { Pressable } from 'react-native';
 
 const CATEGORIES: (Category | 'all')[] = [
   'all', 'shopping', 'work', 'travel', 'receipt', 'conversation', 'unknown',
@@ -23,9 +27,16 @@ export default function LibraryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
-    hasOnboarded, isLoading, isProcessing, processingProgress,
+    hasOnboarded, isLoading,
     filteredScreenshots, activeCategory, setActiveCategory, totalIndexed,
   } = useScreenshots();
+
+  const openImport = useCallback(() => {
+    Haptics.selectionAsync();
+    // Cast: the typed-routes union regenerates to include '/import' when the
+    // Expo dev server runs; the cast keeps typecheck green until then.
+    router.push('/import' as Href);
+  }, []);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   // Clear the floating pill (66px) + its bottom margin + breathing room
@@ -56,7 +67,7 @@ export default function LibraryScreen() {
     [colors],
   );
 
-  if (isLoading) return null;
+  if (isLoading) return <LoadingScreen />;
   if (!hasOnboarded) return <OnboardingScreen />;
 
   const gridData: GridRow[] =
@@ -71,20 +82,27 @@ export default function LibraryScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16 }]}>
-        <View>
-          <Text style={[styles.logo, { color: colors.foreground }]}>Library</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            {totalIndexed} screenshots indexed
-          </Text>
-        </View>
-        {isProcessing && (
-          <View style={[styles.processingPill, { backgroundColor: colors.primary + '22' }]}>
-            <Feather name="cpu" size={12} color={colors.primary} />
-            <Text style={[styles.processingText, { color: colors.primary }]}>
-              {Math.round(processingProgress)}%
+        <View style={styles.headerLeft}>
+          <View style={[styles.logoMark, { backgroundColor: colors.primary + '22' }]}>
+            <Feather name="zap" size={16} color={colors.primary} />
+          </View>
+          <View>
+            <Text style={[styles.logo, { color: colors.foreground }]}>Library</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+              {totalIndexed} screenshot{totalIndexed === 1 ? '' : 's'} indexed
             </Text>
           </View>
-        )}
+        </View>
+        <Pressable
+          onPress={openImport}
+          hitSlop={10}
+          style={({ pressed }) => [
+            styles.importBtn,
+            { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.92 : 1 }] },
+          ]}
+        >
+          <Feather name="plus" size={20} color={colors.primaryForeground} />
+        </Pressable>
       </View>
 
       {/* Category pills — inner View carries the padding so left edge isn't clipped on web */}
@@ -127,6 +145,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingBottom: 14,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logoMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logo: {
     fontSize: 30,
     fontFamily: 'DMSans_700Bold',
@@ -137,17 +167,12 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_400Regular',
     marginTop: 2,
   },
-  processingPill: {
-    flexDirection: 'row',
+  importBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  processingText: {
-    fontSize: 12,
-    fontFamily: 'DMSans_600SemiBold',
+    justifyContent: 'center',
   },
   pillsScroll: { flexGrow: 0, marginBottom: 6 },
   pillsRow: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 4 },

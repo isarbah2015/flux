@@ -5,6 +5,8 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ScreenshotsProvider } from '@/context/ScreenshotsContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import LoginScreen from '@/components/LoginScreen';
 import {
   DMSans_400Regular,
   DMSans_500Medium,
@@ -14,10 +16,23 @@ import {
 } from '@expo-google-fonts/dm-sans';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+// Side-effect import: configures the API client base URL at startup.
+import '@/lib/api';
+import { injectWebStyles } from '@/lib/webStyles';
+
+injectWebStyles();
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+/** Renders the login screen when Firebase auth is enabled and no user is signed in. */
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { authEnabled, isReady, user } = useAuth();
+  if (authEnabled && !isReady) return null; // resolving persisted session
+  if (authEnabled && !user) return <LoginScreen />;
+  return <>{children}</>;
+}
 
 function RootLayoutNav() {
   return (
@@ -29,6 +44,14 @@ function RootLayoutNav() {
           headerShown: false,
           presentation: 'card',
           animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="import"
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
         }}
       />
     </Stack>
@@ -55,13 +78,17 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <ScreenshotsProvider>
-            <GestureHandlerRootView>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
-          </ScreenshotsProvider>
+          <AuthProvider>
+            <ScreenshotsProvider>
+              <GestureHandlerRootView>
+                <KeyboardProvider>
+                  <AuthGate>
+                    <RootLayoutNav />
+                  </AuthGate>
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </ScreenshotsProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

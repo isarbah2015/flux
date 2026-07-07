@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useScreenshots } from '@/context/ScreenshotsContext';
+import { useAuth } from '@/context/AuthContext';
 import { Feather } from '@expo/vector-icons';
 
 interface RowProps {
@@ -67,6 +68,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { totalIndexed } = useScreenshots();
+  const { authEnabled, user, signOut } = useAuth();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
@@ -93,7 +95,9 @@ export default function SettingsScreen() {
 
           {/* Info */}
           <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: colors.foreground }]}>Flux User</Text>
+            <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>
+              {user?.email ?? 'Flux User'}
+            </Text>
             <View style={[styles.planBadge, { backgroundColor: colors.secondary }]}>
               <View style={[styles.planDot, { backgroundColor: '#30D158' }]} />
               <Text style={[styles.planText, { color: colors.mutedForeground }]}>Free Plan</Text>
@@ -179,6 +183,23 @@ export default function SettingsScreen() {
             <Feather name="arrow-right" size={16} color="#fff" />
           </Pressable>
         </View>
+
+        {/* Account */}
+        {authEnabled && (
+          <>
+            <SectionLabel title="ACCOUNT" />
+            <Group>
+              <Row
+                icon="log-out"
+                iconColor={colors.destructive}
+                label="Sign out"
+                onPress={() => { void signOut(); }}
+                destructive
+                last
+              />
+            </Group>
+          </>
+        )}
 
         {/* About */}
         <SectionLabel title="ABOUT" />

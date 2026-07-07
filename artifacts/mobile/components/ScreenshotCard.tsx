@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from '@/constants/colors';
 import type { Screenshot } from '@/context/ScreenshotsContext';
@@ -29,37 +30,51 @@ export default function ScreenshotCard({ item }: Props) {
 
   return (
     <Pressable
-      onPress={() => { Haptics.selectionAsync(); router.push(`/screenshot/${item.id}`); }}
+      onPress={() => {
+        Haptics.selectionAsync();
+        router.push(`/screenshot/${item.id}`);
+      }}
       style={({ pressed }) => [
         styles.card,
         {
           backgroundColor: colors.card,
-          shadowColor: catColor,
-          transform: [{ scale: pressed ? 0.95 : 1 }],
+          borderColor: colors.border,
+          transform: [{ scale: pressed ? 0.96 : 1 }],
         },
       ]}
     >
-      {/* Thumbnail - only this area clips */}
-      <View style={[styles.thumbnail, { backgroundColor: catColor + '16' }]}>
-        {/* Soft corner accent */}
-        <View style={[styles.accentCorner, { backgroundColor: catColor + '30' }]} />
-        <View style={[styles.iconWrap, { backgroundColor: catColor + '28' }]}>
-          <Feather name={catIcon as any} size={26} color={catColor} />
+      <LinearGradient
+        colors={[catColor + '28', catColor + '08', colors.card]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.thumbnail}
+      >
+        <View style={[styles.accentCorner, { backgroundColor: catColor + '35' }]} />
+        <View style={[styles.iconWrap, { backgroundColor: catColor + '30' }]}>
+          <Feather name={catIcon as keyof typeof Feather.glyphMap} size={26} color={catColor} />
         </View>
         {hasInsight && (
           <View style={[styles.insightBadge, { backgroundColor: catColor }]}>
             <Feather name="zap" size={9} color="#fff" />
           </View>
         )}
-        <Text style={[styles.timeStamp, { color: catColor + 'BB' }]}>{timeAgo(item.capturedAt)}</Text>
-      </View>
+        <View style={[styles.timePill, { backgroundColor: colors.background + 'CC' }]}>
+          <Text style={[styles.timeStamp, { color: colors.mutedForeground }]}>
+            {timeAgo(item.capturedAt)}
+          </Text>
+        </View>
+      </LinearGradient>
 
-      {/* Content – no border, just breathes */}
       <View style={styles.content}>
         <Text style={[styles.category, { color: catColor }]}>{catLabel.toUpperCase()}</Text>
         <Text style={[styles.summary, { color: colors.foreground }]} numberOfLines={2}>
           {item.summary}
         </Text>
+        {item.tags.length > 0 && (
+          <Text style={[styles.tagLine, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {item.tags.slice(0, 3).join(' · ')}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
@@ -70,15 +85,11 @@ const styles = StyleSheet.create({
     flex: 1,
     margin: 6,
     borderRadius: 20,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   thumbnail: {
     height: 118,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -86,11 +97,11 @@ const styles = StyleSheet.create({
   },
   accentCorner: {
     position: 'absolute',
-    top: -24,
-    right: -24,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    top: -28,
+    right: -28,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
   },
   iconWrap: {
     width: 54,
@@ -103,23 +114,28 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 10,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  timeStamp: {
+  timePill: {
     position: 'absolute',
     bottom: 8,
     right: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  timeStamp: {
     fontSize: 10,
     fontFamily: 'DMSans_500Medium',
   },
   content: {
     padding: 12,
     paddingTop: 10,
-    gap: 4,
+    gap: 3,
   },
   category: {
     fontSize: 9,
@@ -128,7 +144,12 @@ const styles = StyleSheet.create({
   },
   summary: {
     fontSize: 12,
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: 'DMSans_600SemiBold',
     lineHeight: 17,
+  },
+  tagLine: {
+    fontSize: 10,
+    fontFamily: 'DMSans_400Regular',
+    marginTop: 2,
   },
 });
