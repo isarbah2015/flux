@@ -1,14 +1,29 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as MediaLibrary from 'expo-media-library';
+import type { Asset, Album, AssetsOptions, GranularPermission } from 'expo-media-library';
 import { readAsStringAsync } from 'expo-file-system/legacy';
+
+type MediaLibraryModule = typeof import('expo-media-library');
+
+let mediaLibraryModule: MediaLibraryModule | null | undefined;
+
+function getMediaLibrary(): MediaLibraryModule | null {
+  if (mediaLibraryModule !== undefined) return mediaLibraryModule;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    mediaLibraryModule = require('expo-media-library') as MediaLibraryModule;
+  } catch {
+    mediaLibraryModule = null;
+  }
+  return mediaLibraryModule;
+}
 
 const INDEXED_ASSETS_KEY = 'flux_indexed_asset_ids';
 const PAGE_SIZE = 100;
 const MAX_TOTAL_ASSETS = 500;
 const MAX_IMPORT_PER_SCAN = 15;
-const PHOTO_ONLY: MediaLibrary.GranularPermission[] = ['photo'];
+const PHOTO_ONLY: GranularPermission[] = ['photo'];
 
 export type ScreenshotAccess = 'granted' | 'denied' | 'limited' | 'unavailable';
 
@@ -23,7 +38,7 @@ export type ScannedScreenshot = {
 export type DeviceScanSummary = {
   permission: ScreenshotAccess;
   candidates: number;
-  newAssets: MediaLibrary.Asset[];
+  newAssets: Asset[];
   totalOnDevice: number;
 };
 
@@ -40,6 +55,9 @@ function isScreenshotFilename(filename: string): boolean {
 
 /** Ask for photo-library access (Screenshots album lives inside it). */
 export async function requestScreenshotLibraryAccess(): Promise<ScreenshotAccess> {
+  const MediaLibrary = getMediaLibrary();
+  if (!MediaLibrary) return 'unavailable';
+
   try {
     const result =
       Platform.OS === 'android'
@@ -82,7 +100,9 @@ export async function markAssetsIndexed(assetIds: string[]): Promise<void> {
   await AsyncStorage.setItem(INDEXED_ASSETS_KEY, JSON.stringify(capped));
 }
 
-async function findScreenshotsAlbum(): Promise<MediaLibrary.Album | null> {
+async function findScreenshotsAlbum(): Promise<Album | null> {
+  const MediaLibrary = getMediaLibrary();
+  if (!MediaLibrary) return null;
   const albums = await MediaLibrary.getAlbumsAsync({ includeSmartAlbums: true });
   return (
     albums.find((album) => album.title.toLowerCase().includes('screenshot')) ??
@@ -91,11 +111,14 @@ async function findScreenshotsAlbum(): Promise<MediaLibrary.Album | null> {
   );
 }
 
-type PageOptions = Omit<MediaLibrary.AssetsOptions, 'after' | 'first'>;
+type PageOptions = Omit<AssetsOptions, 'after' | 'first'>;
 
 /** Paginate through the library — mirrors iOS PHAsset mediaSubtype screenshot fetch. */
-async function paginateAssets(options: PageOptions): Promise<MediaLibrary.Asset[]> {
-  const collected: MediaLibrary.Asset[] = [];
+async function paginateAssets(options: PageOptions): Promise<Asset[]> {
+  const MediaLibrary = getMediaLibrary();
+  if (!MediaLibrary) return [];
+
+  const collected: Asset[] = [];
   let after: string | undefined;
   let hasNext = true;
 
@@ -119,7 +142,10 @@ async function paginateAssets(options: PageOptions): Promise<MediaLibrary.Asset[
  * iOS: mediaSubtypes screenshot (same as PHAssetMediaSubtype.photoScreenshot).
  * Android: Screenshots album, then filename heuristics.
  */
-async function loadAllScreenshotCandidates(): Promise<MediaLibrary.Asset[]> {
+async function loadAllScreenshotCandidates(): Promise<Asset[]> {
+  const MediaLibrary = getMediaLibrary();
+  if (!MediaLibrary) return [];
+
   const album = await findScreenshotsAlbum();
 
   if (album) {
@@ -155,7 +181,8 @@ export async function discoverNewScreenshots(): Promise<DeviceScanSummary> {
   }
 
   if (permission === 'limited') {
-    await MediaLibrary.presentPermissionsPickerAsync(['photo']).catch(() => undefined);
+    const MediaLibrary = getMediaLibrary();
+    await MediaLibrary?.presentPermissionsPickerAsync(['photo']).catch(() => undefined);
   }
 
   const indexed = await readIndexedAssetIds();
@@ -172,7 +199,10 @@ export async function discoverNewScreenshots(): Promise<DeviceScanSummary> {
   };
 }
 
-async function resolveReadableUri(asset: MediaLibrary.Asset): Promise<string | null> {
+async function resolveReadableUri(asset: Asset): Promise<string | null> {
+  const MediaLibrary = getMediaLibrary();
+  if (!MediaLibrary) return null;
+
   const info = await MediaLibrary.getAssetInfoAsync(asset.id, {
     shouldDownloadFromNetwork: true,
   });
@@ -196,13 +226,13 @@ async function resolveReadableUri(asset: MediaLibrary.Asset): Promise<string | n
 }
 
 /** Resolve a readable file URI for an asset (no base64 read). */
-export async function getScreenshotAssetUri(asset: MediaLibrary.Asset): Promise<string | null> {
+export async function getScreenshotAssetUri(asset: Asset): Promise<string | null> {
   return resolveReadableUri(asset);
 }
 
 /** Read one gallery asset as base64 for upload. */
 export async function readScreenshotAsset(
-  asset: MediaLibrary.Asset,
+  asset: Asset,
 ): Promise<ScannedScreenshot | null> {
   const uri = await resolveReadableUri(asset);
   if (!uri) return null;

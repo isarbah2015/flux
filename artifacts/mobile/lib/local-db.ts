@@ -36,6 +36,46 @@ export interface LocalScreenshotRow {
 }
 
 let dbPromise: Promise<SQLiteTypes.SQLiteDatabase> | null = null;
+let ftsEnabled = false;
+
+async function initSchema(db: SQLiteTypes.SQLiteDatabase): Promise<void> {
+  await db.execAsync(`
+    PRAGMA journal_mode = WAL;
+    CREATE TABLE IF NOT EXISTS screenshots (
+      id TEXT PRIMARY KEY NOT NULL,
+      local_asset_id TEXT,
+      image_uri TEXT,
+      captured_at TEXT NOT NULL,
+      category TEXT NOT NULL,
+      tags TEXT NOT NULL,
+      extracted_text TEXT NOT NULL DEFAULT '',
+      summary TEXT NOT NULL DEFAULT '',
+      color_hex TEXT NOT NULL,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      synced INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
+  try {
+    await db.execAsync(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS screenshots_fts USING fts5(
+        screenshot_id UNINDEXED,
+        extracted_text,
+        summary,
+        tags,
+        category,
+        tokenize='porter unicode61'
+      );
+    `);
+    ftsEnabled = true;
+  } catch {
+    ftsEnabled = false;
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[Flux DB] FTS5 unavailable — using LIKE search fallback.');
+    }
+  }
+}
 
 function getDb(): Promise<SQLiteTypes.SQLiteDatabase> {
   if (!dbPromise) {
@@ -45,30 +85,7 @@ function getDb(): Promise<SQLiteTypes.SQLiteDatabase> {
         throw new Error('expo-sqlite unavailable in this runtime');
       }
       const db = await SQLite.openDatabaseAsync('flux.db');
-      await db.execAsync(`
-        PRAGMA journal_mode = WAL;
-        CREATE TABLE IF NOT EXISTS screenshots (
-          id TEXT PRIMARY KEY NOT NULL,
-          local_asset_id TEXT,
-          image_uri TEXT,
-          captured_at TEXT NOT NULL,
-          category TEXT NOT NULL,
-          tags TEXT NOT NULL,
-          extracted_text TEXT NOT NULL DEFAULT '',
-          summary TEXT NOT NULL DEFAULT '',
-          color_hex TEXT NOT NULL,
-          metadata TEXT NOT NULL DEFAULT '{}',
-          synced INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE VIRTUAL TABLE IF NOT EXISTS screenshots_fts USING fts5(
-          screenshot_id UNINDEXED,
-          extracted_text,
-          summary,
-          tags,
-          category,
-          tokenize='porter unicode61'
-        );
-      `);
+      await initSchema(db);
       return db;
     })();
   }
@@ -133,16 +150,22 @@ export async function insertLocalScreenshot(row: LocalScreenshotRow): Promise<vo
     row.synced,
   );
 
-  await db.runAsync(`DELETE FROM screenshots_fts WHERE screenshot_id = ?`, row.id);
-  await db.runAsync(
-    `INSERT INTO screenshots_fts (screenshot_id, extracted_text, summary, tags, category)
-     VALUES (?, ?, ?, ?, ?)`,
-    row.id,
-    row.extractedText,
-    row.summary,
-    tagsJson,
-    row.category,
-  );
+  if (ftsEnabled) {
+    try {
+      await db.runAsync(`DELETE FROM screenshots_fts WHERE screenshot_id = ?`, row.id);
+      await db.runAsync(
+        `INSERT INTO screenshots_fts (screenshot_id, extracted_text, summary, tags, category)
+         VALUES (?, ?, ?, ?, ?)`,
+        row.id,
+        row.extractedText,
+        row.summary,
+        tagsJson,
+        row.category,
+      );
+    } catch {
+      ftsEnabled = false;
+    }
+  }
 }
 
 export async function getAllLocalScreenshots(): Promise<Screenshot[]> {
@@ -171,6 +194,7 @@ export async function searchLocalScreenshots(query: string): Promise<Screenshot[
     .join(' ');
 
   try {
+    if (!ftsEnabled) throw new Error('FTS disabled');
     const rows = await db.getAllAsync<Record<string, unknown>>(
       `SELECT s.* FROM screenshots_fts fts
        JOIN screenshots s ON s.id = fts.screenshot_id

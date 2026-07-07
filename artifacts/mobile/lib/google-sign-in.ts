@@ -2,26 +2,23 @@ import { useCallback, useEffect, useState } from 'react';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import { getGoogleClientIds, isGoogleSignInConfigured } from '@/lib/google-sign-in-config';
+
+export { isGoogleSignInConfigured } from '@/lib/google-sign-in-config';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-
-export function isGoogleSignInConfigured(): boolean {
-  return Boolean(WEB_CLIENT_ID);
-}
-
 /**
- * Google OAuth → Firebase via ID token. Works in Expo Go when
- * EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is set (Firebase Console → Auth → Google).
+ * Google OAuth → Firebase via ID token.
+ * Only imported from LoginScreen (lazy-loaded in AuthGate) so expo-auth-session
+ * does not load during app bootstrap.
  */
 export function useGoogleSignIn() {
+  const { web, ios, android } = getGoogleClientIds();
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: WEB_CLIENT_ID,
-    iosClientId: IOS_CLIENT_ID ?? WEB_CLIENT_ID,
-    androidClientId: ANDROID_CLIENT_ID ?? WEB_CLIENT_ID,
+    clientId: web,
+    iosClientId: ios ?? web,
+    androidClientId: android ?? web,
     redirectUri: makeRedirectUri({ scheme: 'mobile', path: 'oauth/google' }),
   });
 

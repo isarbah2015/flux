@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -8,7 +8,7 @@ import { ScreenshotsProvider } from '@/context/ScreenshotsContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PremiumProvider } from '@/context/PremiumContext';
 import { ProfileProvider } from '@/context/ProfileContext';
-import LoginScreen from '@/components/LoginScreen';
+import LoadingScreen from '@/components/LoadingScreen';
 import BootstrapGate from '@/components/BootstrapGate';
 import OnboardingGate from '@/components/OnboardingGate';
 import {
@@ -26,11 +26,28 @@ import { injectWebStyles } from '@/lib/webStyles';
 injectWebStyles();
 SplashScreen.preventAutoHideAsync();
 
+if (__DEV__) {
+  const defaultHandler = (global as { ErrorUtils?: { getGlobalHandler?: () => (e: Error, isFatal?: boolean) => void; setGlobalHandler?: (h: (e: Error, isFatal?: boolean) => void) => void } }).ErrorUtils?.getGlobalHandler?.();
+  (global as { ErrorUtils?: { setGlobalHandler?: (h: (e: Error, isFatal?: boolean) => void) => void } }).ErrorUtils?.setGlobalHandler?.((error, isFatal) => {
+    // eslint-disable-next-line no-console
+    console.error('[Flux] Uncaught error', isFatal ? '(fatal)' : '', error);
+    defaultHandler?.(error, isFatal);
+  });
+}
+
 const queryClient = new QueryClient();
+
+const LoginScreen = lazy(() => import('@/components/LoginScreen'));
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { authEnabled, user } = useAuth();
-  if (authEnabled && !user) return <LoginScreen />;
+  if (authEnabled && !user) {
+    return (
+      <Suspense fallback={<LoadingScreen label="Loading sign-in…" />}>
+        <LoginScreen />
+      </Suspense>
+    );
+  }
   return <>{children}</>;
 }
 

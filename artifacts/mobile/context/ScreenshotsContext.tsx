@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState, Platform, type AppStateStatus } from 'react-native';
+import { AppState, InteractionManager, Platform, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -170,20 +170,23 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        await initLocalDb();
-        const rows = await getAllLocalScreenshots();
-        setLocalScreenshots(rows);
-      } catch (err) {
-        if (__DEV__) {
-          // eslint-disable-next-line no-console
-          console.warn('[Flux] local DB unavailable — continuing without on-device store:', err);
+    const task = InteractionManager.runAfterInteractions(() => {
+      void (async () => {
+        try {
+          await initLocalDb();
+          const rows = await getAllLocalScreenshots();
+          setLocalScreenshots(rows);
+        } catch (err) {
+          if (__DEV__) {
+            // eslint-disable-next-line no-console
+            console.warn('[Flux] local DB unavailable — continuing without on-device store:', err);
+          }
+        } finally {
+          setLocalReady(true);
         }
-      } finally {
-        setLocalReady(true);
-      }
-    })();
+      })();
+    });
+    return () => task.cancel();
   }, []);
 
   const query = useGetScreenshots(undefined, {
