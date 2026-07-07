@@ -45,7 +45,7 @@ export default function LoadingScreen({ label }: { label?: string }) {
         <Animated.View
           style={[styles.ring, { borderColor: colors.primary }, ringStyle]}
         />
-        <Animated.View style={logoStyle}>
+        <Animated.View style={[styles.logoWrap, logoStyle]}>
           <FluxLogo size={88} />
         </Animated.View>
         <Text style={[styles.brand, { color: colors.foreground }]}>Flux</Text>
@@ -62,11 +62,16 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', gap: 14 },
   ring: {
     position: 'absolute',
-    top: -14,
+    top: 0,
     width: 116,
     height: 116,
     borderRadius: 58,
     borderWidth: 2,
+    zIndex: 0,
+  },
+  logoWrap: {
+    zIndex: 2,
+    marginTop: 14,
   },
   brand: {
     fontSize: 26,

@@ -18,6 +18,7 @@ import {
   DMSans_700Bold,
   useFonts,
 } from '@expo-google-fonts/dm-sans';
+import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import '@/lib/api';
@@ -77,6 +78,9 @@ export default function RootLayout() {
     DMSans_500Medium,
     DMSans_600SemiBold,
     DMSans_700Bold,
+    // Preload the Feather glyph font so icons never render as raw fallback
+    // text (the stray letters that appear "on" the icons before it loads).
+    ...Feather.font,
   });
 
   const fontsReady = fontsLoaded || !!fontError;

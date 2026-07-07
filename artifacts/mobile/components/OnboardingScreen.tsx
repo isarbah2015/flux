@@ -169,6 +169,7 @@ const styles = StyleSheet.create({
   glowBlob: {
     position: 'absolute',
     top: '15%',
+    zIndex: 1,
   },
   iconCircle: {
     width: 100,
@@ -176,6 +177,8 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    zIndex: 2,
   },
   title: {
     fontSize: 40,
