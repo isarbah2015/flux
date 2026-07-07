@@ -1,6 +1,25 @@
-import * as SQLite from 'expo-sqlite';
+import type * as SQLiteTypes from 'expo-sqlite';
 import type { Category, Screenshot } from '@/context/ScreenshotsContext';
 import type { ScreenshotMetadata } from '@/lib/on-device-classifier';
+
+/**
+ * expo-sqlite is a native module. To keep the startup import graph free of any
+ * native access (which can crash the app before first paint if the runtime does
+ * not include the module), we resolve it lazily and cache the result. When it is
+ * unavailable the store degrades to a no-op and the app falls back to API data.
+ */
+let sqliteModule: typeof SQLiteTypes | null | undefined;
+
+function getSQLite(): typeof SQLiteTypes | null {
+  if (sqliteModule !== undefined) return sqliteModule;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    sqliteModule = require('expo-sqlite') as typeof SQLiteTypes;
+  } catch {
+    sqliteModule = null;
+  }
+  return sqliteModule;
+}
 
 export interface LocalScreenshotRow {
   id: string;
@@ -16,11 +35,15 @@ export interface LocalScreenshotRow {
   synced: number;
 }
 
-let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let dbPromise: Promise<SQLiteTypes.SQLiteDatabase> | null = null;
 
-function getDb(): Promise<SQLite.SQLiteDatabase> {
+function getDb(): Promise<SQLiteTypes.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = (async () => {
+      const SQLite = getSQLite();
+      if (!SQLite) {
+        throw new Error('expo-sqlite unavailable in this runtime');
+      }
       const db = await SQLite.openDatabaseAsync('flux.db');
       await db.execAsync(`
         PRAGMA journal_mode = WAL;

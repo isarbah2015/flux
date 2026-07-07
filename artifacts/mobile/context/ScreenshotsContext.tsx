@@ -390,10 +390,25 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
       ? screenshots
       : screenshots.filter((s) => s.category === activeCategory);
 
-  const searchScreenshotsFts = useCallback(async (q: string): Promise<Screenshot[]> => {
-    if (!q.trim()) return [];
-    return searchLocalScreenshots(q);
-  }, []);
+  const searchScreenshotsFts = useCallback(
+    async (q: string): Promise<Screenshot[]> => {
+      if (!q.trim()) return [];
+      try {
+        return await searchLocalScreenshots(q);
+      } catch {
+        // Local store unavailable — fall back to in-memory filter over merged data.
+        const needle = q.toLowerCase();
+        return screenshots.filter(
+          (s) =>
+            s.extractedText.toLowerCase().includes(needle) ||
+            s.summary.toLowerCase().includes(needle) ||
+            s.tags.some((t) => t.toLowerCase().includes(needle)) ||
+            s.category.toLowerCase().includes(needle),
+        );
+      }
+    },
+    [screenshots],
+  );
 
   const searchScreenshots = useCallback(
     (q: string): Screenshot[] => {
