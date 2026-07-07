@@ -46,8 +46,7 @@
       ],
       "expo-font",
       "expo-web-browser",
-    "expo-sqlite",
-    "expo-text-extractor",
+      "expo-sqlite",
       [
         "expo-media-library",
         {

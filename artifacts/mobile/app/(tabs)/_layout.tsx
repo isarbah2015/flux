@@ -119,13 +119,32 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
 
   const bottom = Platform.OS === 'web' ? 14 : Math.max(insets.bottom, 6);
 
+  // iSync Pro: the whole pill lifts and settles each time the active tab changes.
+  const lift = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.sequence([
+      Animated.spring(lift, {
+        toValue: -8,
+        speed: 20,
+        bounciness: 0,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
+      Animated.spring(lift, {
+        toValue: 0,
+        speed: 10,
+        bounciness: 14,
+        useNativeDriver: NATIVE_DRIVER,
+      }),
+    ]).start();
+  }, [lift, state.index]);
+
   if (!hasOnboarded) return null;
 
   return (
     <View style={[styles.wrapper, { bottom: bottom + 6 }]} pointerEvents="box-none">
       <View style={[styles.glow, { shadowColor: ACCENT }]} pointerEvents="none" />
 
-      <View style={styles.pillShadow}>
+      <Animated.View style={[styles.pillShadow, { transform: [{ translateY: lift }] }]}>
         <BlurView intensity={55} tint="dark" style={styles.blurPill}>
           <View style={[styles.pill, { borderColor: 'rgba(255,255,255,0.09)' }]}>
             {state.routes.map((route: any, index: number) => {
@@ -154,7 +173,7 @@ function FluxTabBar({ state, navigation }: { state: any; navigation: any; descri
             })}
           </View>
         </BlurView>
-      </View>
+      </Animated.View>
     </View>
   );
 }
