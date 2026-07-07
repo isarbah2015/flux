@@ -19,3 +19,4 @@
 
 export * from "./screenshots";
 export * from "./subscriptions";
+export * from "./profiles";

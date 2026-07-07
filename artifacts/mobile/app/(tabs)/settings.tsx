@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -15,13 +14,15 @@ import { useColors } from '@/hooks/useColors';
 import { useScreenshots } from '@/context/ScreenshotsContext';
 import { useAuth } from '@/context/AuthContext';
 import { usePremium } from '@/context/PremiumContext';
+import { useProfile } from '@/context/ProfileContext';
 import {
   openPrivacyPolicy,
   sendFeedback,
-  showProfileInfo,
 } from '@/lib/actions';
+import FluxLogo from '@/components/FluxLogo';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 
 interface RowProps {
   icon: string;
@@ -76,6 +77,10 @@ export default function SettingsScreen() {
   const { totalIndexed } = useScreenshots();
   const { authEnabled, user, signOut } = useAuth();
   const { isPremium, isCheckingOut, paystackConfigured, startCheckout, refresh } = usePremium();
+  const { profile } = useProfile();
+
+  const displayName = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Flux User';
+  const handle = profile?.profileId ? `@${profile.profileId}` : 'Set your profile ID';
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
@@ -97,18 +102,23 @@ export default function SettingsScreen() {
       >
         <SectionLabel title="PROFILE" />
         <Pressable
-          onPress={() => showProfileInfo(user?.email)}
+          onPress={() => { Haptics.selectionAsync(); router.push('/profile'); }}
           style={({ pressed }) => [
             styles.profileCard,
             { backgroundColor: colors.card, opacity: pressed ? 0.85 : 1 },
           ]}
         >
           <View style={[styles.avatar, { backgroundColor: colors.primary + '28' }]}>
-            <Feather name="user" size={26} color={colors.primary} />
+            <Text style={[styles.avatarInitials, { color: colors.primary }]}>
+              {displayName.slice(0, 2).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>
-              {user?.email ?? 'Flux User'}
+              {displayName}
+            </Text>
+            <Text style={[styles.profileHandle, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {handle}
             </Text>
             <View style={[styles.planBadge, { backgroundColor: isPremium ? colors.primary + '22' : colors.secondary }]}>
               <View style={[styles.planDot, { backgroundColor: isPremium ? colors.primary : '#30D158' }]} />
@@ -123,7 +133,7 @@ export default function SettingsScreen() {
         </Pressable>
 
         <View style={styles.appHeader}>
-          <Image source={require('@/assets/images/icon.png')} style={styles.appIconImg} />
+          <FluxLogo size={76} />
           <Text style={[styles.appName, { color: colors.foreground }]}>Flux</Text>
           <Text style={[styles.appTagline, { color: colors.mutedForeground }]}>
             Your screenshots, alive.
@@ -172,7 +182,7 @@ export default function SettingsScreen() {
                 {isPremium ? 'Flux Premium Active' : 'Flux Premium'}
               </Text>
               <Text style={[styles.premiumPrice, { color: colors.primary }]}>
-                {isPremium ? 'Thank you for supporting Flux' : '$9.99 / month via Paystack'}
+                {isPremium ? 'Thank you for supporting Flux' : '₵99 / month via Paystack'}
               </Text>
             </View>
           </View>
@@ -260,6 +270,8 @@ const styles = StyleSheet.create({
   },
   profileInfo: { flex: 1, gap: 6 },
   profileName: { fontSize: 17, fontFamily: 'DMSans_700Bold' },
+  profileHandle: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
+  avatarInitials: { fontSize: 18, fontFamily: 'DMSans_700Bold' },
   planBadge: {
     flexDirection: 'row',
     alignItems: 'center',

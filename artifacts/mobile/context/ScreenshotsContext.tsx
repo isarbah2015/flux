@@ -72,6 +72,7 @@ interface ScreenshotsContextType {
   screenshots: Screenshot[];
   isImporting: boolean;
   hasOnboarded: boolean;
+  onboardingChecked: boolean;
   isLoading: boolean;
   error: unknown;
   activeCategory: Category | 'all';
@@ -267,12 +268,9 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
         screenshots,
         isImporting: createMutation.isPending,
         hasOnboarded,
-        // Loading until onboarding + auth resolve, and while the first fetch runs.
-        // Skip the fetch spinner when onboarding hasn't completed — show slides instead.
-        isLoading:
-          !onboardingChecked ||
-          (authEnabled && !authReady) ||
-          (hasOnboarded && canFetch && query.isLoading && !query.data),
+        onboardingChecked,
+        // Library fetch only — auth + splash handled at root BootstrapGate.
+        isLoading: hasOnboarded && canFetch && query.isLoading && !query.data,
         error: query.error,
         activeCategory,
         setActiveCategory,

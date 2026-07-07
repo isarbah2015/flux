@@ -12,8 +12,7 @@ import { useColors } from '@/hooks/useColors';
 import { useScreenshots, type Category, type Screenshot } from '@/context/ScreenshotsContext';
 import ScreenshotCard from '@/components/ScreenshotCard';
 import CategoryPill from '@/components/CategoryPill';
-import OnboardingScreen from '@/components/OnboardingScreen';
-import LoadingScreen from '@/components/LoadingScreen';
+import FluxLogo from '@/components/FluxLogo';
 import { Feather } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -27,8 +26,7 @@ export default function LibraryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
-    hasOnboarded, isLoading,
-    filteredScreenshots, activeCategory, setActiveCategory, totalIndexed,
+    filteredScreenshots, activeCategory, setActiveCategory, totalIndexed, isLoading,
   } = useScreenshots();
 
   const openImport = useCallback(() => {
@@ -67,8 +65,14 @@ export default function LibraryScreen() {
     [colors],
   );
 
-  if (isLoading) return <LoadingScreen />;
-  if (!hasOnboarded) return <OnboardingScreen />;
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <FluxLogo size={64} />
+        <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading library…</Text>
+      </View>
+    );
+  }
 
   const gridData: GridRow[] =
     filteredScreenshots.length === 0
@@ -83,9 +87,7 @@ export default function LibraryScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16 }]}>
         <View style={styles.headerLeft}>
-          <View style={[styles.logoMark, { backgroundColor: colors.primary + '22' }]}>
-            <Feather name="zap" size={16} color={colors.primary} />
-          </View>
+          <FluxLogo size={36} style={styles.logoMark} />
           <View>
             <Text style={[styles.logo, { color: colors.foreground }]}>Library</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
@@ -151,11 +153,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   logoMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexShrink: 0,
   },
   logo: {
     fontSize: 30,
@@ -195,4 +193,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 240,
   },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { fontSize: 14, fontFamily: 'DMSans_400Regular' },
 });
