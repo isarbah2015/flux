@@ -13,14 +13,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { useAuth } from '@/context/AuthContext';
-import { isGoogleSignInConfigured, useGoogleSignIn } from '@/lib/google-sign-in';
+import { googleNativeErrorMessage, useAuth } from '@/context/AuthContext';
 import { injectWebStyles } from '@/lib/webStyles';
 import FluxLogo from '@/components/FluxLogo';
 
 type Mode = 'signin' | 'signup';
 
 function friendlyError(e: unknown): string {
+  const nativeGoogle = googleNativeErrorMessage(e);
+  if (nativeGoogle) return nativeGoogle;
+
   const code = (e as { code?: string })?.code ?? '';
   switch (code) {
     case 'auth/invalid-email':
@@ -35,8 +37,6 @@ function friendlyError(e: unknown): string {
       return 'Password should be at least 6 characters.';
     case 'auth/account-exists-with-different-credential':
       return 'An account already exists with this email using a different sign-in method.';
-    case 'auth/popup-closed-by-user':
-      return 'Sign-in was cancelled.';
     default:
       return e instanceof Error ? e.message : 'Something went wrong. Try again.';
   }
@@ -47,9 +47,8 @@ export default function LoginScreen() {
 
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { signInWithEmail, signUpWithEmail, signInWithGoogleIdToken } = useAuth();
-  const google = useGoogleSignIn();
-  const googleEnabled = isGoogleSignInConfigured();
+  const { signInWithEmail, signUpWithEmail, signInWithGoogle, googleSignInAvailable, isExpoGo } =
+    useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -61,11 +60,10 @@ export default function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      const idToken = await google.signIn();
-      if (!idToken) return;
-      await signInWithGoogleIdToken(idToken);
+      await signInWithGoogle();
     } catch (e) {
-      setError(friendlyError(e));
+      const msg = friendlyError(e);
+      if (msg) setError(msg);
     } finally {
       setBusy(false);
     }
@@ -97,12 +95,13 @@ export default function LoginScreen() {
     },
   ];
 
+  const showGoogle = googleSignInAvailable;
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      {/* Ambient glow */}
       <LinearGradient
         colors={[`${colors.primary}22`, 'transparent', `${colors.accent}11`]}
         style={StyleSheet.absoluteFill}
@@ -181,7 +180,7 @@ export default function LoginScreen() {
             </LinearGradient>
           </Pressable>
 
-          {googleEnabled && (
+          {showGoogle && (
             <>
               <View style={styles.dividerRow}>
                 <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
@@ -191,13 +190,13 @@ export default function LoginScreen() {
 
               <Pressable
                 onPress={submitGoogle}
-                disabled={busy || !google.ready}
+                disabled={busy}
                 style={({ pressed }) => [
                   styles.googleBtn,
                   {
                     backgroundColor: colors.secondary,
                     borderColor: colors.border,
-                    opacity: busy || !google.ready ? 0.6 : pressed ? 0.85 : 1,
+                    opacity: busy ? 0.6 : pressed ? 0.85 : 1,
                   },
                 ]}
               >
@@ -231,9 +230,9 @@ export default function LoginScreen() {
         </View>
 
         <Text style={[styles.note, { color: colors.mutedForeground }]}>
-          {googleEnabled
-            ? 'Sign in securely with Firebase'
-            : 'Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to enable Google sign-in'}
+          {isExpoGo
+            ? 'Google Sign-In works in a dev build (npx expo run:ios). Use email/password in Expo Go.'
+            : 'Sign in securely with Firebase'}
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -244,14 +243,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 28 },
   hero: { alignItems: 'center', gap: 10 },
-  logo: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
   title: { fontSize: 36, fontFamily: 'DMSans_700Bold', letterSpacing: -1.2 },
   subtitle: {
     fontSize: 15,

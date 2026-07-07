@@ -55,13 +55,20 @@
           "photosPermission": "Flux reads your Screenshots album to classify and organize them automatically.",
           "savePhotosPermission": "Allow Flux to access photos.",
           "isAccessMediaLocationEnabled": false,
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.629513991075-3cveb0kbok06hn5g2eccleo4b34pche3"
         }
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     }
   }
 }
