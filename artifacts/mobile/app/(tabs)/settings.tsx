@@ -133,7 +133,7 @@ export default function SettingsScreen() {
         </Pressable>
 
         <View style={styles.appHeader}>
-          <FluxLogo size={76} />
+          <FluxLogo size={56} />
           <Text style={[styles.appName, { color: colors.foreground }]}>Flux</Text>
           <Text style={[styles.appTagline, { color: colors.mutedForeground }]}>
             Your screenshots, alive.

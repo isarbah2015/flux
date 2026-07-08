@@ -1,13 +1,10 @@
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ScreenshotsProvider } from '@/context/ScreenshotsContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { PremiumProvider } from '@/context/PremiumContext';
-import { ProfileProvider } from '@/context/ProfileContext';
 import LoadingScreen from '@/components/LoadingScreen';
 import BootstrapGate from '@/components/BootstrapGate';
 import OnboardingGate from '@/components/OnboardingGate';
@@ -22,22 +19,14 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import '@/lib/api';
 import { injectWebStyles } from '@/lib/webStyles';
-import { loadIconFonts } from '@/lib/icon-fonts';
 
 injectWebStyles();
 SplashScreen.preventAutoHideAsync();
 
-if (__DEV__) {
-  const defaultHandler = (global as { ErrorUtils?: { getGlobalHandler?: () => (e: Error, isFatal?: boolean) => void; setGlobalHandler?: (h: (e: Error, isFatal?: boolean) => void) => void } }).ErrorUtils?.getGlobalHandler?.();
-  (global as { ErrorUtils?: { setGlobalHandler?: (h: (e: Error, isFatal?: boolean) => void) => void } }).ErrorUtils?.setGlobalHandler?.((error, isFatal) => {
-    // eslint-disable-next-line no-console
-    console.error('[Flux] Uncaught error', isFatal ? '(fatal)' : '', error);
-    defaultHandler?.(error, isFatal);
-  });
-}
-
 const queryClient = new QueryClient();
 
+/** Heavy providers (screenshots DB, billing) load only after auth boot — keeps Expo Go startup light. */
+const AppProviders = lazy(() => import('@/components/AppProviders'));
 const LoginScreen = lazy(() => import('@/components/LoginScreen'));
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -82,12 +71,6 @@ export default function RootLayout() {
 
   const fontsReady = fontsLoaded || !!fontError;
 
-  useEffect(() => {
-    if (fontsReady) {
-      void loadIconFonts();
-    }
-  }, [fontsReady]);
-
   if (!fontsReady) return null;
 
   return (
@@ -96,21 +79,19 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <BootstrapGate fontsReady={fontsReady}>
-              <PremiumProvider>
-                <ProfileProvider>
-                  <ScreenshotsProvider>
-                    <GestureHandlerRootView style={{ flex: 1 }}>
-                      <KeyboardProvider>
-                        <AuthGate>
-                          <OnboardingGate>
-                            <RootLayoutNav />
-                          </OnboardingGate>
-                        </AuthGate>
-                      </KeyboardProvider>
-                    </GestureHandlerRootView>
-                  </ScreenshotsProvider>
-                </ProfileProvider>
-              </PremiumProvider>
+              <Suspense fallback={<LoadingScreen label="Loading Flux…" />}>
+                <AppProviders>
+                  <GestureHandlerRootView style={{ flex: 1 }}>
+                    <KeyboardProvider>
+                      <AuthGate>
+                        <OnboardingGate>
+                          <RootLayoutNav />
+                        </OnboardingGate>
+                      </AuthGate>
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </AppProviders>
+              </Suspense>
             </BootstrapGate>
           </AuthProvider>
         </QueryClientProvider>

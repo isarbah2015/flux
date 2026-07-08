@@ -111,7 +111,7 @@ export default function LoginScreen() {
 
       <View style={[styles.inner, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.hero}>
-          <FluxLogo size={88} />
+          <FluxLogo size={64} />
           <Text style={[styles.title, { color: colors.foreground }]}>Flux</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
             {mode === 'signin'

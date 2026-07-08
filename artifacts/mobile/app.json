@@ -21,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/splash-icon.png",
         "backgroundColor": "#0C0C14"
       },
       "package": "com.flux.screenshotos",
@@ -43,7 +43,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 120,
           "resizeMode": "contain",
           "backgroundColor": "#0C0C14"
         }
@@ -56,7 +56,6 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-sqlite",
       [
         "expo-media-library",
         {

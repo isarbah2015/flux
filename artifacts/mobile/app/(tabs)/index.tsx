@@ -81,7 +81,7 @@ export default function LibraryScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
-        <FluxLogo size={64} />
+        <FluxLogo size={48} />
         <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading library…</Text>
       </View>
     );
@@ -100,7 +100,7 @@ export default function LibraryScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16 }]}>
         <View style={styles.headerLeft}>
-          <FluxLogo size={36} style={styles.logoMark} />
+          <FluxLogo size={28} style={styles.logoMark} />
           <View>
             <Text style={[styles.logo, { color: colors.foreground }]}>Library</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
