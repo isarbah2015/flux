@@ -67,9 +67,13 @@
     "expo": "~54.0.35",
     "expo-build-properties": "~1.0.10",
     "expo-sqlite": "~16.0.10",
-    "expo-text-extractor": "^2.0.0",
     "firebase": "^12.15.0",
     "react": "19.1.0",
     "react-native": "0.81.5"
+  },
+  "expo": {
+    "autolinking": {
+      "exclude": ["expo-text-extractor"]
+    }
   }
 }

@@ -1,54 +1,22 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import FluxLogo from '@/components/FluxLogo';
 
 /**
  * Branded loading state shown while auth / onboarding / the first fetch resolve.
+ * Uses only core RN views (no Reanimated) to avoid Hermes SIGSEGV on cold start.
  */
 export default function LoadingScreen({ label }: { label?: string }) {
   const colors = useColors();
-  const pulse = useSharedValue(0);
-
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 900, easing: Easing.out(Easing.quad) }),
-        withTiming(0, { duration: 900, easing: Easing.in(Easing.quad) }),
-      ),
-      -1,
-      false,
-    );
-  }, [pulse]);
-
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: 0.85 + pulse.value * 0.15,
-    transform: [{ scale: 0.96 + pulse.value * 0.06 }],
-  }));
-
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: 0.12 + pulse.value * 0.2,
-    transform: [{ scale: 1 + pulse.value * 0.2 }],
-  }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.center}>
-        <Animated.View
-          style={[styles.ring, { borderColor: colors.primary }, ringStyle]}
-        />
-        <Animated.View style={[styles.logoWrap, logoStyle]}>
-          <FluxLogo size={88} />
-        </Animated.View>
+        <View style={[styles.ring, { borderColor: colors.primary }]} />
+        <FluxLogo size={88} />
         <Text style={[styles.brand, { color: colors.foreground }]}>Flux</Text>
+        <ActivityIndicator color={colors.primary} style={styles.spinner} />
         <Text style={[styles.label, { color: colors.mutedForeground }]}>
           {label ?? 'Waking up your screenshot brain…'}
         </Text>
@@ -59,7 +27,7 @@ export default function LoadingScreen({ label }: { label?: string }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  center: { alignItems: 'center', gap: 14 },
+  center: { alignItems: 'center', gap: 12 },
   ring: {
     position: 'absolute',
     top: 0,
@@ -67,11 +35,7 @@ const styles = StyleSheet.create({
     height: 116,
     borderRadius: 58,
     borderWidth: 2,
-    zIndex: 0,
-  },
-  logoWrap: {
-    zIndex: 2,
-    marginTop: 14,
+    opacity: 0.25,
   },
   brand: {
     fontSize: 26,
@@ -79,8 +43,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginTop: 6,
   },
+  spinner: { marginTop: 4 },
   label: {
     fontSize: 13,
     fontFamily: 'DMSans_400Regular',
+    textAlign: 'center',
+    maxWidth: 280,
   },
 });

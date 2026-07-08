@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -13,8 +12,9 @@ import {
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import { auth, isFirebaseConfigured } from '@/lib/firebase';
 import { getGoogleClientIds, isGoogleSignInConfigured } from '@/lib/google-sign-in-config';
+import { isExpoGo } from '@/lib/runtime';
 
-const IS_EXPO_GO = Constants.appOwnership === 'expo';
+const IS_EXPO_GO = isExpoGo;
 
 let googleConfigured = false;
 

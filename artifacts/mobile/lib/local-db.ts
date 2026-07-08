@@ -1,6 +1,7 @@
 import type * as SQLiteTypes from 'expo-sqlite';
 import type { Category, Screenshot } from '@/context/ScreenshotsContext';
 import type { ScreenshotMetadata } from '@/lib/on-device-classifier';
+import { supportsLocalDb } from '@/lib/runtime';
 
 /**
  * expo-sqlite is a native module. To keep the startup import graph free of any
@@ -36,6 +37,8 @@ export interface LocalScreenshotRow {
 }
 
 let dbPromise: Promise<SQLiteTypes.SQLiteDatabase> | null = null;
+/** FTS5 disabled — virtual tables have caused native Hermes crashes on Android. */
+const ENABLE_FTS5 = false;
 let ftsEnabled = false;
 
 async function initSchema(db: SQLiteTypes.SQLiteDatabase): Promise<void> {
@@ -57,6 +60,7 @@ async function initSchema(db: SQLiteTypes.SQLiteDatabase): Promise<void> {
   `);
 
   try {
+    if (!ENABLE_FTS5) throw new Error('FTS disabled');
     await db.execAsync(`
       CREATE VIRTUAL TABLE IF NOT EXISTS screenshots_fts USING fts5(
         screenshot_id UNINDEXED,
@@ -78,6 +82,9 @@ async function initSchema(db: SQLiteTypes.SQLiteDatabase): Promise<void> {
 }
 
 function getDb(): Promise<SQLiteTypes.SQLiteDatabase> {
+  if (!supportsLocalDb) {
+    return Promise.reject(new Error('Local DB disabled in Expo Go'));
+  }
   if (!dbPromise) {
     dbPromise = (async () => {
       const SQLite = getSQLite();
@@ -125,10 +132,12 @@ function parseRow(raw: Record<string, unknown>): LocalScreenshotRow {
 }
 
 export async function initLocalDb(): Promise<void> {
+  if (!supportsLocalDb) return;
   await getDb();
 }
 
 export async function insertLocalScreenshot(row: LocalScreenshotRow): Promise<void> {
+  if (!supportsLocalDb) return;
   const db = await getDb();
   const tagsJson = JSON.stringify(row.tags);
   const metadataJson = JSON.stringify(row.metadata);
@@ -169,6 +178,7 @@ export async function insertLocalScreenshot(row: LocalScreenshotRow): Promise<vo
 }
 
 export async function getAllLocalScreenshots(): Promise<Screenshot[]> {
+  if (!supportsLocalDb) return [];
   const db = await getDb();
   const rows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT * FROM screenshots ORDER BY captured_at DESC`,
@@ -177,12 +187,14 @@ export async function getAllLocalScreenshots(): Promise<Screenshot[]> {
 }
 
 export async function markLocalSynced(id: string): Promise<void> {
+  if (!supportsLocalDb) return;
   const db = await getDb();
   await db.runAsync(`UPDATE screenshots SET synced = 1 WHERE id = ?`, id);
 }
 
 /** FTS5 full-text search — on-device, no server. */
 export async function searchLocalScreenshots(query: string): Promise<Screenshot[]> {
+  if (!supportsLocalDb) return [];
   const q = query.trim();
   if (!q) return [];
 

@@ -15,7 +15,10 @@ type TextExtractor = {
 
 let cachedModule: TextExtractor | null | undefined;
 
+import { supportsOnDeviceOcr } from '@/lib/runtime';
+
 function getExtractor(): TextExtractor | null {
+  if (!supportsOnDeviceOcr) return null;
   if (cachedModule !== undefined) return cachedModule;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

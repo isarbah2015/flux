@@ -17,6 +17,7 @@ import {
   type Screenshot as ApiScreenshot,
 } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
+import { supportsLocalDb } from '@/lib/runtime';
 import {
   discoverNewScreenshots,
   getScreenshotAssetUri,
@@ -153,7 +154,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState<{ done: number; total: number } | null>(null);
   const [localScreenshots, setLocalScreenshots] = useState<Screenshot[]>([]);
-  const [localReady, setLocalReady] = useState(false);
+  const [localReady, setLocalReady] = useState(!supportsLocalDb);
   const [isProcessing, setIsProcessing] = useState(false);
   const scanInFlight = useRef(false);
   const hasBootstrappedScan = useRef(false);
@@ -170,6 +171,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
+    if (!supportsLocalDb) return;
     const task = InteractionManager.runAfterInteractions(() => {
       void (async () => {
         try {
