@@ -512,6 +512,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
 
       if (supportsLocalDb) {
         await runPriceWatchScan();
+        await repairLocalScreenshotImages();
         const rows = await getAllLocalScreenshotRows();
         const shots = rows.map(localRowToScreenshot);
         setLocalScreenshots(shots);

@@ -82,6 +82,11 @@ export async function resolveScreenshotDisplayUri(
   localAssetId?: string | null,
   screenshotId?: string | null,
 ): Promise<string | null> {
+  if (screenshotId) {
+    const cachedById = await materializeImageToCache(null, null, screenshotId);
+    if (cachedById && (await fileUriExists(cachedById))) return cachedById;
+  }
+
   const direct = imageUri ? normalizeDisplayUri(imageUri) : null;
 
   if (direct && (await fileUriExists(direct))) {
@@ -94,7 +99,7 @@ export async function resolveScreenshotDisplayUri(
   }
 
   if (direct) {
-    const materialized = await materializeImageToCache(direct, null, screenshotId);
+    const materialized = await materializeImageToCache(direct, null, screenshotId ?? undefined);
     if (materialized) return materialized;
     if (direct.startsWith('content://')) return direct;
   }

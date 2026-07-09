@@ -10,6 +10,10 @@ import { ocrFromImageUri } from '@/lib/ocr-service';
 import { fileUriExists, materializeImageToCache } from '@/lib/image-materialize';
 import { isPremiumCached } from '@/lib/premium-cache';
 import { reconcilePriceTracking } from '@/lib/price-watch';
+import {
+  matchGalleryAssetForTimestamp,
+  requestScreenshotLibraryAccess,
+} from '@/lib/screenshot-scanner';
 import { readImageBase64FromUri, resolveScreenshotDisplayUri, assetStorageId } from '@/lib/screenshot-uri';
 
 export interface ProcessScreenshotInput {
@@ -142,22 +146,65 @@ export function localRowToScreenshot(row: LocalScreenshotRow) {
   };
 }
 
+async function persistStableThumbnail(
+  sourceUri: string | null,
+  rowId: string,
+): Promise<string | null> {
+  if (!sourceUri) return null;
+
+  const stable = await materializeImageToCache(sourceUri, null, rowId);
+  if (stable && (await fileUriExists(stable))) return stable;
+  if (sourceUri.startsWith('content://')) return sourceUri;
+  if (sourceUri.startsWith('file://') && (await fileUriExists(sourceUri))) return sourceUri;
+  return stable;
+}
+
 /** Re-materialize missing/stale image files from gallery asset ids (e.g. after cache clear). */
 export async function repairLocalScreenshotImages(): Promise<number> {
+  await requestScreenshotLibraryAccess().catch(() => undefined);
+
   const rows = await getAllLocalScreenshotRows();
+  const usedAssetIds = new Set<string>();
   let repaired = 0;
 
   for (const row of rows) {
-    const storageId = row.localAssetId ? assetStorageId(row.localAssetId) : row.id;
-    const displayUri = await resolveScreenshotDisplayUri(
-      row.imageUri,
-      row.localAssetId,
-      storageId,
-    );
-    if (!displayUri) continue;
-    if (displayUri === row.imageUri && (await fileUriExists(displayUri))) continue;
+    if (row.localAssetId) usedAssetIds.add(row.localAssetId);
 
-    await insertLocalScreenshot({ ...row, imageUri: displayUri });
+    const stableExisting = await materializeImageToCache(null, null, row.id);
+    if (stableExisting && (await fileUriExists(stableExisting))) {
+      if (row.imageUri === stableExisting) continue;
+      await insertLocalScreenshot({ ...row, imageUri: stableExisting });
+      repaired += 1;
+      continue;
+    }
+
+    let localAssetId = row.localAssetId;
+    if (!localAssetId) {
+      const matched = await matchGalleryAssetForTimestamp(row.capturedAt, usedAssetIds);
+      if (matched) {
+        localAssetId = matched.id;
+        usedAssetIds.add(matched.id);
+      }
+    }
+
+    const storageId = localAssetId ? assetStorageId(localAssetId) : row.id;
+    const displayUri = await resolveScreenshotDisplayUri(row.imageUri, localAssetId, storageId);
+    if (!displayUri) continue;
+
+    const stableUri = await persistStableThumbnail(displayUri, row.id);
+    if (!stableUri) continue;
+
+    const unchanged =
+      stableUri === row.imageUri &&
+      localAssetId === row.localAssetId &&
+      (await fileUriExists(stableUri));
+    if (unchanged) continue;
+
+    await insertLocalScreenshot({
+      ...row,
+      localAssetId: localAssetId ?? row.localAssetId,
+      imageUri: stableUri,
+    });
     repaired += 1;
   }
 
