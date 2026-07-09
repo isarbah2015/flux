@@ -12,6 +12,9 @@ export const SCREENSHOT_CATEGORIES = [
   "travel",
   "receipt",
   "conversation",
+  "ideas",
+  "finance",
+  "food",
   "unknown",
 ] as const;
 

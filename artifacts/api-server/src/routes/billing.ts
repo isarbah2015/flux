@@ -1,21 +1,38 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, subscriptionsTable } from "@workspace/db";
-import { requireAuth, userId } from "../middlewares/auth";
+import { requireAuth, userEmail, userId } from "../middlewares/auth";
 import { logger } from "../lib/logger";
 import {
   initializePremiumPayment,
   isPaystackConfigured,
+  paystackMode,
+  premiumPricePayload,
   verifyTransaction,
   verifyWebhookSignature,
-  PREMIUM_AMOUNT_PESEWAS,
-  PREMIUM_AMOUNT_GHS,
+  PREMIUM_AMOUNT_CENTS,
   PREMIUM_CURRENCY,
+  PREMIUM_LIFETIME_MS,
 } from "../lib/paystack";
+import { isTestingEnv } from "../lib/flux-env";
+import { isTrialActive, trialStatusPayload } from "../lib/trial";
+import type { Subscription } from "@workspace/db";
 
 const router: IRouter = Router();
 
-const PREMIUM_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days per payment
+const GRANT_PREMIUM_DURATION_MS = PREMIUM_LIFETIME_MS;
+
+const PREMIUM_GRANT_EMAILS = new Set(
+  (process.env.PREMIUM_GRANT_EMAILS ?? "isarbah2015@gmail.com")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+function isGrantedPremiumEmail(email: string | undefined): boolean {
+  if (!email) return false;
+  return PREMIUM_GRANT_EMAILS.has(email.trim().toLowerCase());
+}
 
 async function getOrCreateSubscription(uid: string) {
   const [existing] = await db
@@ -24,17 +41,61 @@ async function getOrCreateSubscription(uid: string) {
     .where(eq(subscriptionsTable.userId, uid))
     .limit(1);
 
-  if (existing) return existing;
+  if (existing) {
+    if (!existing.trialStartedAt && !existing.isPremium) {
+      const trialStartedAt = new Date();
+      const [updated] = await db
+        .update(subscriptionsTable)
+        .set({ trialStartedAt, updatedAt: new Date() })
+        .where(eq(subscriptionsTable.userId, uid))
+        .returning();
+      return updated ?? { ...existing, trialStartedAt };
+    }
+    return existing;
+  }
 
+  const trialStartedAt = new Date();
   const [created] = await db
     .insert(subscriptionsTable)
-    .values({ userId: uid })
+    .values({ userId: uid, trialStartedAt })
     .returning();
   return created;
 }
 
-async function activatePremium(uid: string, reference: string, email?: string) {
-  const until = new Date(Date.now() + PREMIUM_DURATION_MS);
+function isPaidPremium(sub: Subscription): boolean {
+  return Boolean(
+    sub.isPremium && (!sub.premiumUntil || sub.premiumUntil.getTime() > Date.now()),
+  );
+}
+
+function hasPremiumAccess(sub: Subscription): boolean {
+  return isPaidPremium(sub) || isTrialActive(sub.trialStartedAt);
+}
+
+function subscriptionStatusPayload(sub: Subscription) {
+  const paid = isPaidPremium(sub);
+  const access = hasPremiumAccess(sub);
+  const trial = trialStatusPayload(sub.trialStartedAt);
+
+  return {
+    isPremium: access,
+    isPaidPremium: paid,
+    plan: access ? ("premium" as const) : ("free" as const),
+    premiumUntil: sub.premiumUntil?.toISOString() ?? null,
+    ...trial,
+    ...premiumPricePayload(),
+    paystackConfigured: isPaystackConfigured(),
+    paystackMode: paystackMode(),
+  };
+}
+
+async function activatePremium(
+  uid: string,
+  reference: string,
+  email?: string,
+  durationMs = PREMIUM_LIFETIME_MS,
+) {
+  const until = new Date(Date.now() + durationMs);
   await db
     .insert(subscriptionsTable)
     .values({
@@ -60,28 +121,59 @@ async function activatePremium(uid: string, reference: string, email?: string) {
   return until;
 }
 
+async function ensureEmailGrantPremium(uid: string, email: string) {
+  const reference = `grant:${email.toLowerCase()}`;
+  return activatePremium(uid, reference, email, GRANT_PREMIUM_DURATION_MS);
+}
+
+// GET /api/billing/public-status — no auth; Paystack availability for Settings UI
+router.get("/billing/public-status", (_req, res) => {
+  res.json({
+    paystackConfigured: isPaystackConfigured(),
+    paystackMode: paystackMode(),
+    ...premiumPricePayload(),
+  });
+});
+
 // GET /api/billing/status
 router.get("/billing/status", requireAuth, async (req, res) => {
   const uid = userId(req);
+  const email = userEmail(req);
+
+  if (isGrantedPremiumEmail(email)) {
+    const premiumUntil = await ensureEmailGrantPremium(uid, email!);
+    res.json({
+      isPremium: true,
+      isPaidPremium: true,
+      plan: "premium",
+      premiumUntil: premiumUntil.toISOString(),
+      isOnTrial: false,
+      trialEndsAt: null,
+      trialDaysLeft: 0,
+      ...premiumPricePayload(),
+      paystackConfigured: isPaystackConfigured(),
+      paystackMode: paystackMode(),
+    });
+    return;
+  }
+
   const sub = await getOrCreateSubscription(uid);
-
-  const active =
-    sub.isPremium && (!sub.premiumUntil || sub.premiumUntil.getTime() > Date.now());
-
-  res.json({
-    isPremium: active,
-    plan: active ? "premium" : "free",
-    premiumUntil: sub.premiumUntil?.toISOString() ?? null,
-    priceGhs: String(PREMIUM_AMOUNT_GHS),
-    currency: PREMIUM_CURRENCY,
-    paystackConfigured: isPaystackConfigured(),
-  });
+  res.json(subscriptionStatusPayload(sub));
 });
 
 // POST /api/billing/initialize
 router.post("/billing/initialize", requireAuth, async (req, res) => {
   if (!isPaystackConfigured()) {
     res.status(503).json({ error: "Paystack is not configured. Set PAYSTACK_SECRET_KEY on the API server." });
+    return;
+  }
+
+  if (
+    paystackMode() === "test" &&
+    process.env.PAYSTACK_REQUIRE_LIVE === "true" &&
+    !isTestingEnv()
+  ) {
+    res.status(503).json({ error: "Paystack is in test mode. Sync live keys with scripts/sync-paystack-from-scoutgrid.sh" });
     return;
   }
 
@@ -101,8 +193,8 @@ router.post("/billing/initialize", requireAuth, async (req, res) => {
       authorizationUrl: result.authorizationUrl,
       accessCode: result.accessCode,
       reference: result.reference,
-      amount: PREMIUM_AMOUNT_PESEWAS,
-      currency: PREMIUM_CURRENCY,
+      amount: PREMIUM_AMOUNT_CENTS,
+      ...premiumPricePayload(),
     });
   } catch (err) {
     logger.error({ err }, "Paystack initialize failed");
@@ -139,9 +231,14 @@ router.get("/billing/verify", requireAuth, async (req, res) => {
     const premiumUntil = await activatePremium(uid, reference);
     res.json({
       isPremium: true,
+      isPaidPremium: true,
       plan: "premium",
       premiumUntil: premiumUntil.toISOString(),
+      isOnTrial: false,
+      trialEndsAt: null,
+      trialDaysLeft: 0,
       reference: verified.reference,
+      ...premiumPricePayload(),
     });
   } catch (err) {
     logger.error({ err }, "Paystack verify failed");

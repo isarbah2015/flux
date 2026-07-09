@@ -100,6 +100,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteScreenshot
+      tags: [screenshots]
+      summary: Delete a screenshot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted.
+        "404":
+          description: No screenshot with that id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     HealthStatus:
@@ -124,6 +144,9 @@ components:
         - travel
         - receipt
         - conversation
+        - ideas
+        - finance
+        - food
         - unknown
     PriceTracking:
       type: object

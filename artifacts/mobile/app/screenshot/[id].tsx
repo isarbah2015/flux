@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
-  Platform,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import { useColors } from '@/hooks/useColors';
+import { useScreenInsets } from '@/hooks/useScreenInsets';
+import { usePremiumGate } from '@/hooks/usePremiumGate';
 import { useScreenshots } from '@/context/ScreenshotsContext';
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from '@/constants/colors';
 import { Feather } from '@expo/vector-icons';
@@ -20,16 +23,51 @@ import {
   setPromiseReminder,
   shareScreenshot,
 } from '@/lib/actions';
+import {
+  copyFollowUpMessage,
+  copyProofPack,
+  openSmsFollowUp,
+} from '@/lib/promise-follow-up';
+import FormattedExtractedText from '@/components/FormattedExtractedText';
+import ScreenshotImage from '@/components/ScreenshotImage';
+import { formatExtractedText, formattedTextForCopy } from '@/lib/format-extracted-text';
 
 export default function ScreenshotDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const { getScreenshot } = useScreenshots();
+  const { topPad, bottomPad } = useScreenInsets({ tabBar: false });
+  const { getScreenshot, deleteScreenshot } = useScreenshots();
+  const { requirePremium } = usePremiumGate();
   const screenshot = getScreenshot(id ?? '');
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 34 : insets.bottom + 24;
+  const copyText = useCallback(async () => {
+    if (!screenshot?.extractedText?.trim()) return;
+    const paragraphs = formatExtractedText(screenshot.extractedText);
+    await Clipboard.setStringAsync(formattedTextForCopy(paragraphs));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [screenshot?.extractedText]);
+
+  const confirmDelete = useCallback(() => {
+    if (!screenshot) return;
+    Alert.alert(
+      'Delete screenshot?',
+      'This removes it from your library on this device.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await deleteScreenshot(screenshot.id);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+            })();
+          },
+        },
+      ],
+    );
+  }, [deleteScreenshot, screenshot]);
 
   if (!screenshot) {
     return (
@@ -47,75 +85,103 @@ export default function ScreenshotDetail() {
   const catColor = CATEGORY_COLORS[screenshot.category] ?? '#636384';
   const catIcon = CATEGORY_ICONS[screenshot.category] ?? 'image';
   const catLabel = CATEGORY_LABELS[screenshot.category] ?? 'Other';
+  const hasText = !!screenshot.extractedText?.trim();
+  const wordCount = hasText
+    ? screenshot.extractedText.trim().split(/\s+/).filter(Boolean).length
+    : 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Floating back button */}
-      <View style={[styles.topBar, { paddingTop: topPad + 8 }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [
-            styles.backBtn,
-            { backgroundColor: colors.secondary, opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </Pressable>
-        <View style={[styles.catChip, { backgroundColor: catColor + '22' }]}>
-          <Feather name={catIcon as any} size={12} color={catColor} />
-          <Text style={[styles.catChipText, { color: catColor }]}>{catLabel.toUpperCase()}</Text>
+      <LinearGradient
+        colors={[catColor + '22', colors.background]}
+        style={[styles.headerGlow, { paddingTop: topPad }]}
+      >
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              { backgroundColor: colors.card, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Feather name="arrow-left" size={20} color={colors.foreground} />
+          </Pressable>
+          <View style={[styles.catChip, { backgroundColor: catColor + '28', borderColor: catColor + '55' }]}>
+            <Feather name={catIcon as keyof typeof Feather.glyphMap} size={12} color={catColor} />
+            <Text
+              style={[styles.catChipText, { color: catColor }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {catLabel.toUpperCase()}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => { void shareScreenshot(screenshot); }}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              { backgroundColor: colors.card, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Feather name="share-2" size={18} color={colors.foreground} />
+          </Pressable>
+          <Pressable
+            onPress={confirmDelete}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              { backgroundColor: colors.card, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Feather name="trash-2" size={18} color={colors.destructive} />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={() => { void shareScreenshot(screenshot); }}
-          style={({ pressed }) => [
-            styles.backBtn,
-            { backgroundColor: colors.secondary, opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          <Feather name="share-2" size={18} color={colors.foreground} />
-        </Pressable>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingBottom: botPad }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}
       >
-        {/* Hero thumbnail — no border, no clipping except within itself */}
-        <View style={[styles.hero, { backgroundColor: catColor + '14' }]}>
-          {/* Decorative blob */}
-          <View style={[styles.blob, { backgroundColor: catColor + '25' }]} />
-          <View style={[styles.blob2, { backgroundColor: catColor + '15' }]} />
-          <View style={[styles.heroIcon, { backgroundColor: catColor + '2A' }]}>
-            <Feather name={catIcon as any} size={44} color={catColor} />
+        <View style={[styles.hero, { borderColor: catColor + '30' }]}>
+          <ScreenshotImage
+            imageUri={screenshot.imageUri}
+            localAssetId={screenshot.localAssetId}
+            fallbackColor={catColor}
+            style={styles.heroImage}
+            contentFit="contain"
+            iconSize={44}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(8,8,16,0.85)']}
+            style={styles.heroFade}
+            pointerEvents="none"
+          />
+          <View style={styles.heroMeta}>
+            <Text style={styles.heroTitle} numberOfLines={2}>
+              {screenshot.summary}
+            </Text>
+            <Text style={styles.heroDate}>
+              {new Date(screenshot.capturedAt).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
           </View>
-          <Text style={[styles.heroDate, { color: catColor + 'AA' }]}>
-            {new Date(screenshot.capturedAt).toLocaleString(undefined, {
-              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-            })}
-          </Text>
         </View>
 
-        {/* Summary */}
-        <View style={styles.section}>
-          <Text style={[styles.summaryText, { color: colors.foreground }]}>
-            {screenshot.summary}
-          </Text>
-        </View>
-
-        {/* Tags */}
         {screenshot.tags.length > 0 && (
           <View style={styles.tagsRow}>
             {screenshot.tags.map((tag) => (
-              <View key={tag} style={[styles.tag, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.tagText, { color: colors.mutedForeground }]}>#{tag}</Text>
+              <View key={tag} style={[styles.tag, { backgroundColor: catColor + '18', borderColor: catColor + '35' }]}>
+                <Text style={[styles.tagText, { color: catColor }]}>#{tag}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Smart cards — no borders, each gets a tinted background */}
         {screenshot.priceTracking && (
-          <SmartBlock color="#FF9F0A" icon="tag" title="Price Tracking">
+          <SmartBlock color="#FF9F0A" icon="tag" title="Price Watch">
             <Text style={[styles.smartProduct, { color: colors.foreground }]}>
               {screenshot.priceTracking.productName}
             </Text>
@@ -133,11 +199,6 @@ export default function ScreenshotDetail() {
                   {screenshot.priceTracking.currentPrice}
                 </Text>
               </View>
-              {screenshot.priceTracking.priceDropped && (
-                <View style={[styles.dropBadge, { backgroundColor: '#FF9F0A' }]}>
-                  <Text style={styles.dropText}>Price Dropped!</Text>
-                </View>
-              )}
             </View>
             <SmartBtn
               color="#FF9F0A"
@@ -149,70 +210,122 @@ export default function ScreenshotDetail() {
         )}
 
         {screenshot.promise && (
-          <SmartBlock color="#FF375F" icon="user-check" title="Promise Detected">
+          <SmartBlock color="#FF375F" icon="user-check" title="Promise Tracker">
             <Text style={[styles.smartProduct, { color: colors.foreground }]}>
               {screenshot.promise.from}
             </Text>
             <Text style={[styles.promiseQuote, { color: colors.mutedForeground }]}>
               "{screenshot.promise.content}"
             </Text>
-            <View style={[styles.duePill, { backgroundColor: '#FF375F22' }]}>
-              <Feather name="clock" size={12} color="#FF375F" />
-              <Text style={[styles.dueText, { color: '#FF375F' }]}>
-                Due: {screenshot.promise.deadline}
-              </Text>
-            </View>
             <SmartBtn
               color="#FF375F"
               label="Set Reminder"
               icon="bell"
-              onPress={() => { void setPromiseReminder(screenshot); }}
+              onPress={() => {
+                requirePremium('promise_reminders', () => {
+                  void setPromiseReminder(screenshot);
+                });
+              }}
+            />
+            <SmartBtn
+              color="#FF375F"
+              label="Copy follow-up"
+              icon="message-circle"
+              onPress={() => {
+                void copyFollowUpMessage(screenshot).then(() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                });
+              }}
+            />
+            <SmartBtn
+              color="#FF375F"
+              label="Proof pack"
+              icon="clipboard"
+              onPress={() => {
+                void copyProofPack(screenshot).then(() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                });
+              }}
+            />
+            <SmartBtn
+              color="#FF375F"
+              label="Open Messages"
+              icon="send"
+              onPress={() => {
+                void openSmsFollowUp(screenshot);
+              }}
             />
           </SmartBlock>
         )}
 
         {screenshot.calendarEvent && (
-          <SmartBlock color="#00D4FF" icon="calendar" title="Calendar Event">
+          <SmartBlock color="#00D4FF" icon="calendar" title="Calendar">
             <Text style={[styles.smartProduct, { color: colors.foreground }]}>
               {screenshot.calendarEvent.title}
             </Text>
-            <Text style={[styles.promiseQuote, { color: colors.mutedForeground }]}>
-              {screenshot.calendarEvent.date}
-              {screenshot.calendarEvent.time ? '  ·  ' + screenshot.calendarEvent.time : ''}
-            </Text>
-            {screenshot.calendarEvent.location && (
-              <View style={styles.locationRow}>
-                <Feather name="map-pin" size={12} color="#00D4FF" />
-                <Text style={[styles.locationText, { color: colors.mutedForeground }]}>
-                  {screenshot.calendarEvent.location}
-                </Text>
-              </View>
-            )}
             <SmartBtn
               color="#00D4FF"
               label="Add to Calendar"
               icon="plus"
               dark
-              onPress={() => { void addToCalendar(screenshot); }}
+              onPress={() => {
+                requirePremium('calendar_sync', () => {
+                  void addToCalendar(screenshot);
+                });
+              }}
             />
           </SmartBlock>
         )}
 
-        {/* Extracted text */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Extracted Text</Text>
-          <View style={[styles.textBox, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.extractedText, { color: colors.foreground }]}>
-              {screenshot.extractedText}
-            </Text>
-          </View>
+        <View style={[styles.textCard, { borderColor: colors.border }]}>
+          <LinearGradient
+            colors={['#1A1830', '#13131F']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.textCardInner}
+          >
+            <View style={styles.textHeader}>
+              <View style={styles.textHeaderLeft}>
+                <View style={[styles.textIcon, { backgroundColor: '#7C72FF28' }]}>
+                  <Feather name="type" size={14} color="#7C72FF" />
+                </View>
+                <View>
+                  <Text style={styles.textTitle}>Extracted Text</Text>
+                  <Text style={styles.textSub}>
+                    {hasText
+                      ? `${wordCount} word${wordCount === 1 ? '' : 's'} · searchable on device`
+                      : 'Reading on your device…'}
+                  </Text>
+                </View>
+              </View>
+              {hasText && (
+                <Pressable onPress={() => { void copyText(); }} style={styles.copyBtn}>
+                  <Feather name="copy" size={14} color="#BAB4FF" />
+                  <Text style={styles.copyLabel}>Copy</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <View style={[styles.textBody, { backgroundColor: 'rgba(0,0,0,0.28)' }]}>
+              {hasText ? (
+                <FormattedExtractedText
+                  text={screenshot.extractedText}
+                  color="#EDEDF8"
+                  mutedColor={colors.mutedForeground}
+                  emptyMessage=""
+                />
+              ) : (
+                <Text style={[styles.extractedText, { color: colors.mutedForeground }]}>
+                  Flux is extracting text from this screenshot on your phone. Pull down on Library to re-scan if this stays empty after a minute.
+                </Text>
+              )}
+            </View>
+          </LinearGradient>
         </View>
       </ScrollView>
     </View>
   );
 }
-
-/* ─── Sub-components ──────────────────────────────────────── */
 
 function SmartBlock({
   color, icon, title, children,
@@ -221,10 +334,10 @@ function SmartBlock({
 }) {
   const colors = useColors();
   return (
-    <View style={[styles.smartBlock, { backgroundColor: color + '10' }]}>
+    <View style={[styles.smartBlock, { backgroundColor: color + '10', borderColor: color + '28' }]}>
       <View style={styles.smartBlockHeader}>
         <View style={[styles.smartBlockIcon, { backgroundColor: color + '25' }]}>
-          <Feather name={icon as any} size={14} color={color} />
+          <Feather name={icon as keyof typeof Feather.glyphMap} size={14} color={color} />
         </View>
         <Text style={[styles.smartBlockTitle, { color }]}>{title.toUpperCase()}</Text>
       </View>
@@ -250,23 +363,30 @@ function SmartBtn({
       ]}
     >
       <Text style={[styles.smartBtnText, dark && { color: '#0C0C14' }]}>{label}</Text>
-      <Feather name={icon as any} size={14} color={dark ? '#0C0C14' : '#fff'} />
+      <Feather name={icon as keyof typeof Feather.glyphMap} size={14} color={dark ? '#0C0C14' : '#fff'} />
     </Pressable>
   );
 }
-
-/* ─── Styles ──────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFound: { fontSize: 16, fontFamily: 'DMSans_400Regular' },
+  headerGlow: { paddingBottom: 4 },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 10,
+    gap: 8,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backBtn: {
     width: 40,
@@ -276,63 +396,72 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   catChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 13,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    borderWidth: 1,
+    minWidth: 0,
+    maxWidth: '52%',
   },
-  catChipText: { fontSize: 11, fontFamily: 'DMSans_700Bold', letterSpacing: 1 },
-  scroll: { paddingHorizontal: 20, gap: 16 },
-  hero: {
-    height: 190,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-    gap: 12,
-  },
-  blob: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    top: -50,
-    right: -40,
-  },
-  blob2: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    bottom: -30,
-    left: -20,
-  },
-  heroIcon: {
-    width: 86,
-    height: 86,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroDate: { fontSize: 12, fontFamily: 'DMSans_500Medium' },
-  section: { gap: 10 },
-  sectionLabel: {
+  catChipText: {
     fontSize: 11,
-    fontFamily: 'DMSans_600SemiBold',
-    textTransform: 'uppercase',
+    fontFamily: 'DMSans_700Bold',
     letterSpacing: 1,
+    flexShrink: 1,
+    includeFontPadding: false,
   },
-  summaryText: { fontSize: 17, fontFamily: 'DMSans_600SemiBold', lineHeight: 25 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  tag: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
-  tagText: { fontSize: 12, fontFamily: 'DMSans_400Regular' },
-  smartBlock: {
+  scroll: { paddingHorizontal: 18, gap: 16, paddingTop: 4 },
+  hero: {
+    height: 300,
+    borderRadius: 26,
+    overflow: 'hidden',
+    backgroundColor: '#0E0E18',
+    borderWidth: 1,
+  },
+  heroImage: { flex: 1, width: '100%', height: '100%' },
+  heroFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '55%',
+  },
+  heroMeta: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    gap: 4,
+  },
+  heroTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'DMSans_700Bold',
+    lineHeight: 24,
+  },
+  heroDate: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    fontFamily: 'DMSans_500Medium',
+  },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
+    borderWidth: 1,
+  },
+  tagText: { fontSize: 12, fontFamily: 'DMSans_600SemiBold' },
+  smartBlock: {
+    borderRadius: 22,
     padding: 18,
     gap: 12,
+    borderWidth: 1,
   },
   smartBlockHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   smartBlockIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
@@ -343,13 +472,7 @@ const styles = StyleSheet.create({
   priceLabel: { fontSize: 11, fontFamily: 'DMSans_400Regular' },
   priceOld: { fontSize: 17, fontFamily: 'DMSans_500Medium', textDecorationLine: 'line-through' },
   priceNew: { fontSize: 24, fontFamily: 'DMSans_700Bold' },
-  dropBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, marginLeft: 'auto' },
-  dropText: { fontSize: 11, fontFamily: 'DMSans_700Bold', color: '#fff' },
   promiseQuote: { fontSize: 15, fontFamily: 'DMSans_400Regular', fontStyle: 'italic', lineHeight: 22 },
-  duePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  dueText: { fontSize: 13, fontFamily: 'DMSans_600SemiBold' },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  locationText: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
   smartBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -359,6 +482,66 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   smartBtnText: { color: '#fff', fontSize: 15, fontFamily: 'DMSans_700Bold' },
-  textBox: { borderRadius: 16, padding: 16 },
-  extractedText: { fontSize: 13, fontFamily: 'DMSans_400Regular', lineHeight: 21 },
+  textCard: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  textCardInner: {
+    padding: 18,
+    gap: 14,
+  },
+  textHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  textHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  textIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontFamily: 'DMSans_700Bold',
+  },
+  textSub: {
+    color: 'rgba(186,180,255,0.65)',
+    fontSize: 11,
+    fontFamily: 'DMSans_400Regular',
+    marginTop: 2,
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124,114,255,0.15)',
+  },
+  copyLabel: {
+    color: '#BAB4FF',
+    fontSize: 12,
+    fontFamily: 'DMSans_600SemiBold',
+  },
+  textBody: {
+    borderRadius: 16,
+    padding: 16,
+  },
+  extractedText: {
+    fontSize: 14,
+    fontFamily: 'DMSans_400Regular',
+    lineHeight: 23,
+  },
 });

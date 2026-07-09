@@ -27,6 +27,9 @@ const CATEGORY_COLORS: Record<ScreenshotCategory, string> = {
   travel: "#00D4FF",
   receipt: "#30D158",
   conversation: "#FF375F",
+  ideas: "#BF5AF2",
+  finance: "#FFD60A",
+  food: "#FF6482",
   unknown: "#636384",
 };
 
@@ -41,6 +44,9 @@ const SHARED_RULES = `Categories:
 - "travel": flights, hotels, tickets, itineraries. Fill calendarEvent.
 - "conversation": a message/chat. If someone commits to something (money, a task, a date), fill promise.
 - "work": meetings, tasks, roadmaps, work chats.
+- "ideas": notes, brainstorms, reminders, inspiration.
+- "finance": banking, transfers, wallets, payments, statements.
+- "food": restaurants, menus, delivery orders, recipes.
 - "unknown": anything else (plants, objects, misc).
 
 The JSON metadata object should include ONLY the sub-objects that clearly apply; omit the others:
@@ -261,6 +267,36 @@ function keywordClassify(text: string): Omit<Classification, "colorHex"> {
     };
   }
 
+  if (has("bank", "balance", "transfer", "momo", "paystack", "wallet", "transaction", "statement", "payment")) {
+    return {
+      extractedText: text,
+      category: "finance",
+      summary: truncate(firstLine || "Finance"),
+      tags: ["finance", "money"],
+      metadata: {},
+    };
+  }
+
+  if (has("restaurant", "menu", "delivery", "uber eats", "doordash", "recipe", "food", "order #")) {
+    return {
+      extractedText: text,
+      category: "food",
+      summary: truncate(firstLine || "Food"),
+      tags: ["food", "dining"],
+      metadata: {},
+    };
+  }
+
+  if (has("idea", "brainstorm", "notes", "todo", "reminder", "journal", "thought", "inspiration")) {
+    return {
+      extractedText: text,
+      category: "ideas",
+      summary: truncate(firstLine || "Idea"),
+      tags: ["ideas", "notes"],
+      metadata: {},
+    };
+  }
+
   if (has("meeting", "roadmap", "deadline", "action item", "standup", "slack", "eng-")) {
     return {
       extractedText: text,
@@ -285,7 +321,7 @@ function keywordClassify(text: string): Omit<Classification, "colorHex"> {
     extractedText: text,
     category: "unknown",
     summary: truncate(firstLine || "Screenshot"),
-    tags: ["misc"],
+    tags: ["screenshot"],
     metadata: {},
   };
 }

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Asset, Album, AssetsOptions, GranularPermission } from 'expo-media-library';
-import { readAsStringAsync } from 'expo-file-system/legacy';
+import { readImageBase64, materializeImageToCache } from '@/lib/image-materialize';
 
 type MediaLibraryModule = typeof import('expo-media-library');
 
@@ -22,7 +22,7 @@ function getMediaLibrary(): MediaLibraryModule | null {
 const INDEXED_ASSETS_KEY = 'flux_indexed_asset_ids';
 const PAGE_SIZE = 100;
 const MAX_TOTAL_ASSETS = 500;
-const MAX_IMPORT_PER_SCAN = 15;
+const MAX_IMPORT_PER_SCAN = 4;
 const PHOTO_ONLY: GranularPermission[] = ['photo'];
 
 export type ScreenshotAccess = 'granted' | 'denied' | 'limited' | 'unavailable';
@@ -127,6 +127,7 @@ async function paginateAssets(options: PageOptions): Promise<Asset[]> {
       ...options,
       first: PAGE_SIZE,
       after,
+      resolveWithFullInfo: false,
     });
 
     collected.push(...page.assets);
@@ -203,26 +204,36 @@ async function resolveReadableUri(asset: Asset): Promise<string | null> {
   const MediaLibrary = getMediaLibrary();
   if (!MediaLibrary) return null;
 
-  const info = await MediaLibrary.getAssetInfoAsync(asset.id, {
-    shouldDownloadFromNetwork: true,
-  });
+  const directUri = asset.uri?.split('#')[0];
 
-  const uri = (info.localUri ?? info.uri).split('#')[0];
-  if (!uri) return null;
-
-  if (uri.startsWith('file://') || uri.startsWith('content://')) {
-    return uri;
-  }
-
-  if (Platform.OS === 'ios') {
-    const retry = await MediaLibrary.getAssetInfoAsync(asset.id, {
+  try {
+    const info = await MediaLibrary.getAssetInfoAsync(asset.id, {
       shouldDownloadFromNetwork: true,
     });
-    const local = retry.localUri?.split('#')[0];
-    if (local?.startsWith('file://')) return local;
-  }
 
-  return uri.startsWith('ph://') ? null : uri;
+    const local = info.localUri?.split('#')[0];
+    if (local?.startsWith('file://')) {
+      return local;
+    }
+
+    const uri = (info.localUri ?? info.uri)?.split('#')[0];
+    if (!uri) return directUri ?? null;
+
+    if (uri.startsWith('file://')) return uri;
+
+    const materialized = await materializeImageToCache(uri);
+    if (materialized) return materialized;
+
+    return uri.startsWith('ph://') ? null : uri;
+  } catch {
+    if (directUri?.startsWith('file://')) return directUri;
+
+    const materialized = await materializeImageToCache(directUri);
+    if (materialized) return materialized;
+
+    if (directUri?.startsWith('content://')) return directUri;
+    return directUri ?? null;
+  }
 }
 
 /** Resolve a readable file URI for an asset (no base64 read). */
@@ -230,23 +241,48 @@ export async function getScreenshotAssetUri(asset: Asset): Promise<string | null
   return resolveReadableUri(asset);
 }
 
-/** Read one gallery asset as base64 for upload. */
-export async function readScreenshotAsset(
-  asset: Asset,
-): Promise<ScannedScreenshot | null> {
+export type PreparedScreenshot = {
+  assetId: string;
+  filename: string;
+  creationTime: number;
+  imageUri: string;
+};
+
+/** Resolve a gallery asset to a readable URI without loading base64 (avoids OOM during bulk scan). */
+export async function prepareScreenshotAsset(asset: Asset): Promise<PreparedScreenshot | null> {
   const uri = await resolveReadableUri(asset);
   if (!uri) return null;
 
   try {
-    const imageBase64 = await readAsStringAsync(uri, { encoding: 'base64' });
-    if (!imageBase64) return null;
-
+    const readableUri = (await materializeImageToCache(uri)) ?? uri;
     return {
       assetId: asset.id,
       filename: asset.filename,
       creationTime: asset.creationTime,
+      imageUri: readableUri,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Read one gallery asset as base64 for upload (manual import only — avoid during bulk scan). */
+export async function readScreenshotAsset(
+  asset: Asset,
+): Promise<ScannedScreenshot | null> {
+  const prepared = await prepareScreenshotAsset(asset);
+  if (!prepared) return null;
+
+  try {
+    const imageBase64 = await readImageBase64(prepared.imageUri);
+    if (!imageBase64) return null;
+
+    return {
+      assetId: prepared.assetId,
+      filename: prepared.filename,
+      creationTime: prepared.creationTime,
       imageBase64,
-      imageUri: uri,
+      imageUri: prepared.imageUri,
     };
   } catch {
     return null;

@@ -22,13 +22,13 @@ start_tunnel() {
   local pidfile="$LOG_DIR/${name}.pid"
 
   if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
-    echo "[$name] already running (pid $(cat "$pidfile"))"
-    grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$log" 2>/dev/null | tail -1 || true
+    echo "[$name] already running (pid $(cat "$pidfile"))" >&2
+    grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$log" 2>/dev/null | tail -1 | tr -d '\n'
     return
   fi
 
   : > "$log"
-  cloudflared tunnel --url "http://127.0.0.1:${port}" >>"$log" 2>&1 &
+  nohup cloudflared tunnel --url "http://127.0.0.1:${port}" >>"$log" 2>&1 &
   echo $! >"$pidfile"
 
   local url=""
@@ -43,8 +43,8 @@ start_tunnel() {
     return
   fi
 
-  echo "[$name] $url  → localhost:$port"
-  echo "$url"
+  echo "[$name] $url  → localhost:$port" >&2
+  printf '%s' "$url"
 }
 
 echo "Starting Cloudflare quick tunnels…"

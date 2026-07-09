@@ -7,25 +7,34 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0C0C14"
+      "backgroundColor": "#0C0C14",
+      "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.flux.screenshotos",
       "icon": "./assets/images/icon.png",
-      "googleServicesFile": "./firebase/GoogleService-Info.plist"
+      "googleServicesFile": "./firebase/GoogleService-Info.plist",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Flux uses Face ID to keep your screenshots private when app lock is enabled."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/splash-icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0C0C14"
       },
       "package": "com.flux.screenshotos",
-      "googleServicesFile": "./firebase/google-services.json"
+      "googleServicesFile": "./firebase/google-services.json",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.SEND",
+          "category": ["android.intent.category.DEFAULT"],
+          "data": [{ "mimeType": "image/*" }]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -42,9 +51,6 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 120,
-          "resizeMode": "contain",
           "backgroundColor": "#0C0C14"
         }
       ],
@@ -71,6 +77,25 @@
         "@react-native-google-signin/google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.629513991075-3cveb0kbok06hn5g2eccleo4b34pche3"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#7C72FF"
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Flux adds events detected in your screenshots to your calendar."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Flux uses Face ID to keep your screenshots private when app lock is enabled."
         }
       ]
     ],

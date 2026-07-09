@@ -1,17 +1,28 @@
 /**
- * Paystack billing helpers for Flux Premium (₵99/mo GHS).
- * Same Paystack account as ScoutGrid — keys in Firebase Secret Manager.
+ * Paystack billing helpers for Flux Premium ($9.99 USD one-time).
  * Docs: https://paystack.com/docs/api/
  */
 import { createHmac } from "node:crypto";
 
 const PAYSTACK_BASE = "https://api.paystack.co";
 
-/** ₵99.00 in pesewas (GHS subunit — same as ScoutGrid). */
-export const PREMIUM_AMOUNT_PESEWAS = 9900;
-export const PREMIUM_AMOUNT_GHS = 99;
-export const PREMIUM_CURRENCY = "GHS" as const;
+/** $9.99 in cents (USD subunit). */
+export const PREMIUM_AMOUNT_CENTS = 999;
+export const PREMIUM_AMOUNT_USD = 9.99;
+export const PREMIUM_CURRENCY = "USD" as const;
 export const PREMIUM_PLAN_LABEL = "Flux Premium";
+export const PREMIUM_BILLING_TYPE = "one_time" as const;
+
+/** Lifetime premium after one-time payment (~100 years). */
+export const PREMIUM_LIFETIME_MS = 100 * 365 * 24 * 60 * 60 * 1000;
+
+export function premiumPricePayload() {
+  return {
+    price: String(PREMIUM_AMOUNT_USD),
+    currency: PREMIUM_CURRENCY,
+    billingType: PREMIUM_BILLING_TYPE,
+  };
+}
 
 function secretKey(): string {
   const key = process.env.PAYSTACK_SECRET_KEY;
@@ -21,6 +32,26 @@ function secretKey(): string {
 
 export function isPaystackConfigured(): boolean {
   return Boolean(process.env.PAYSTACK_SECRET_KEY);
+}
+
+export type PaystackMode = "live" | "test" | "none";
+
+export function paystackMode(): PaystackMode {
+  const key = process.env.PAYSTACK_SECRET_KEY ?? "";
+  if (!key) return "none";
+  if (key.startsWith("sk_live_")) return "live";
+  if (key.startsWith("sk_test_")) return "test";
+  return "none";
+}
+
+export function assertPaystackLiveForProduction(): void {
+  const fluxEnv = process.env.FLUX_ENV?.trim().toLowerCase();
+  if (fluxEnv === "testing") return;
+  if (process.env.NODE_ENV === "production" && paystackMode() === "test") {
+    throw new Error(
+      "Paystack test keys cannot be used in production. Set PAYSTACK_SECRET_KEY to a live key (sk_live_…).",
+    );
+  }
 }
 
 interface PaystackResponse<T> {
@@ -54,7 +85,7 @@ export interface InitializeResult {
   reference: string;
 }
 
-/** Start a one-time charge for the first month of Premium. */
+/** Start a one-time $9.99 Premium purchase. */
 export async function initializePremiumPayment(opts: {
   email: string;
   userId: string;
@@ -69,14 +100,15 @@ export async function initializePremiumPayment(opts: {
     method: "POST",
     body: JSON.stringify({
       email: opts.email,
-      amount: PREMIUM_AMOUNT_PESEWAS,
+      amount: PREMIUM_AMOUNT_CENTS,
       currency: PREMIUM_CURRENCY,
-      channels: ["card", "mobile_money", "bank"],
+      channels: ["card"],
       reference,
       callback_url: opts.callbackUrl,
       metadata: {
         userId: opts.userId,
-        plan: "premium",
+        plan: "premium_lifetime",
+        billingType: PREMIUM_BILLING_TYPE,
         custom_fields: [
           { display_name: "Flux User", variable_name: "user_id", value: opts.userId },
         ],

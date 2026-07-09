@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MOBILE="$ROOT/artifacts/mobile"
 TARGET="${1:-android}"
-API_URL="${FLUX_API_URL:-https://flux-api.onrender.com}"
+API_URL="${FLUX_API_URL:-https://flux-api-2els.onrender.com}"
 
 export EXPO_PUBLIC_FLUX_ENV=testing
 export EXPO_PUBLIC_API_URL="$API_URL"

@@ -19,7 +19,7 @@ for arg in "$@"; do
   esac
 done
 
-API_URL="${FLUX_API_URL:-https://flux-api.onrender.com}"
+API_URL="${FLUX_API_URL:-https://flux-api-2els.onrender.com}"
 
 echo "Flux API — Render deployment"
 echo ""

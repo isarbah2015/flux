@@ -22,14 +22,14 @@ export const HealthCheckResponse = zod.object({
  * @summary List screenshots
  */
 export const GetScreenshotsQueryParams = zod.object({
-  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'unknown']).optional().describe('Filter to a single category.'),
+  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'ideas', 'finance', 'food', 'unknown']).optional().describe('Filter to a single category.'),
   "q": zod.coerce.string().optional().describe('Full-text query matched against extracted text, summary, and tags.')
 })
 
 export const GetScreenshotsResponseItem = zod.object({
   "id": zod.string().uuid(),
   "imageUri": zod.string().nullish(),
-  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'unknown']),
+  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'ideas', 'finance', 'food', 'unknown']),
   "extractedText": zod.string(),
   "summary": zod.string(),
   "tags": zod.array(zod.string()),
@@ -70,13 +70,13 @@ export const CreateScreenshotBody = zod.object({
   "imageBase64": zod.string().nullish().describe('Base64-encoded image bytes (no data URI prefix) for vision OCR.'),
   "extractedText": zod.string().optional().describe('OCR\'d or user-provided text used to classify the screenshot.'),
   "capturedAt": zod.coerce.date().optional().describe('When the screenshot was taken. Defaults to now.'),
-  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'unknown']).optional()
+  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'ideas', 'finance', 'food', 'unknown']).optional()
 }).describe('Provide `imageBase64` for server-side vision OCR + classification, and\/or `extractedText` for text-only classification. At least one should be set.\n')
 
 export const CreateScreenshotResponse = zod.object({
   "id": zod.string().uuid(),
   "imageUri": zod.string().nullish(),
-  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'unknown']),
+  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'ideas', 'finance', 'food', 'unknown']),
   "extractedText": zod.string(),
   "summary": zod.string(),
   "tags": zod.array(zod.string()),
@@ -118,7 +118,7 @@ export const GetScreenshotParams = zod.object({
 export const GetScreenshotResponse = zod.object({
   "id": zod.string().uuid(),
   "imageUri": zod.string().nullish(),
-  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'unknown']),
+  "category": zod.enum(['shopping', 'work', 'travel', 'receipt', 'conversation', 'ideas', 'finance', 'food', 'unknown']),
   "extractedText": zod.string(),
   "summary": zod.string(),
   "tags": zod.array(zod.string()),

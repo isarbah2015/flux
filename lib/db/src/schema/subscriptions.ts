@@ -3,9 +3,13 @@ import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 export const SUBSCRIPTION_PLANS = ["free", "premium"] as const;
 export type SubscriptionPlan = (typeof SUBSCRIPTION_PLANS)[number];
 
+/** Days of full Premium access for new accounts before paywall. */
+export const PREMIUM_TRIAL_DAYS = 14;
+
 /**
  * Per-user subscription state. `userId` is the Firebase Auth uid (or `local-dev`).
  * Premium is activated after a successful Paystack verification / webhook.
+ * New users get a 14-day trial (`trialStartedAt`) with all Premium features.
  */
 export const subscriptionsTable = pgTable("subscriptions", {
   userId: text("user_id").primaryKey(),
@@ -15,6 +19,7 @@ export const subscriptionsTable = pgTable("subscriptions", {
   paystackEmail: text("paystack_email"),
   lastReference: text("last_reference"),
   premiumUntil: timestamp("premium_until", { withTimezone: true }),
+  trialStartedAt: timestamp("trial_started_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

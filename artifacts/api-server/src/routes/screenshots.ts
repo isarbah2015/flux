@@ -106,4 +106,26 @@ router.get("/screenshots/:id", async (req, res) => {
   res.json(row);
 });
 
+// DELETE /api/screenshots/:id
+router.delete("/screenshots/:id", async (req, res) => {
+  const parsed = GetScreenshotParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const uid = userId(req);
+  const [deleted] = await db
+    .delete(screenshotsTable)
+    .where(and(eq(screenshotsTable.id, parsed.data.id), eq(screenshotsTable.userId, uid)))
+    .returning({ id: screenshotsTable.id });
+
+  if (!deleted) {
+    res.status(404).json({ error: "Screenshot not found" });
+    return;
+  }
+
+  res.status(204).send();
+});
+
 export default router;

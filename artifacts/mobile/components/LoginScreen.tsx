@@ -47,7 +47,7 @@ export default function LoginScreen() {
 
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { signInWithEmail, signUpWithEmail, signInWithGoogle, googleSignInAvailable, isExpoGo } =
+  const { signInWithEmail, signUpWithEmail, signInWithGoogle, continueAsGuest, googleSignInAvailable, isExpoGo } =
     useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
@@ -216,6 +216,25 @@ export default function LoginScreen() {
 
           <Pressable
             onPress={() => {
+              void continueAsGuest();
+            }}
+            disabled={busy}
+            style={({ pressed }) => [
+              styles.guestBtn,
+              {
+                borderColor: colors.border,
+                opacity: busy ? 0.6 : pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Feather name="smartphone" size={16} color={colors.mutedForeground} />
+            <Text style={[styles.guestBtnText, { color: colors.mutedForeground }]}>
+              Continue offline — no account
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
               setMode(mode === 'signin' ? 'signup' : 'signin');
               setError(null);
             }}
@@ -231,7 +250,7 @@ export default function LoginScreen() {
 
         <Text style={[styles.note, { color: colors.mutedForeground }]}>
           {isExpoGo
-            ? 'Google Sign-In works in a dev build (npx expo run:ios). Use email/password in Expo Go.'
+            ? 'Google Sign-In needs a dev build (npx expo run:android). Use email/password in Expo Go.'
             : 'Sign in securely with Firebase'}
         </Text>
       </View>
@@ -298,6 +317,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   googleBtnText: { fontSize: 15, fontFamily: 'DMSans_600SemiBold' },
+  guestBtn: {
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  guestBtnText: { fontSize: 14, fontFamily: 'DMSans_500Medium' },
   toggle: { fontSize: 14, fontFamily: 'DMSans_400Regular', textAlign: 'center', marginTop: 4 },
   note: { fontSize: 12, fontFamily: 'DMSans_400Regular', textAlign: 'center' },
 });

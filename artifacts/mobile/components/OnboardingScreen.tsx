@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import {
   Animated,
   Dimensions,
@@ -12,52 +12,44 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useScreenshots } from '@/context/ScreenshotsContext';
+import { useLocale } from '@/context/LocaleContext';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
-const SLIDES = [
-  {
-    icon: 'zap',
-    color: '#7C72FF',
-    title: 'Your screenshots,\nalive.',
-    subtitle:
-      "You've taken thousands of screenshots. Right now they're just clutter. Flux turns every one into searchable, actionable intelligence.",
-  },
-  {
-    icon: 'search',
-    color: '#00D4FF',
-    title: 'Every word,\nsearchable.',
-    subtitle:
-      "Type anything — a name, a price, a place — and find the screenshot instantly. No more scrolling through thousands of images.",
-  },
-  {
-    icon: 'bell',
-    color: '#FF375F',
-    title: 'Smart alerts,\nzero effort.',
-    subtitle:
-      "Flux tracks prices, detects promises, and reminds you before flights. It works silently in the background so you don't have to.",
-  },
-  {
-    icon: 'shield',
-    color: '#30D158',
-    title: 'Private by\ndesign.',
-    subtitle:
-      "Every screenshot is processed on your device. Nothing leaves your phone. No account. No cloud. Just intelligence that stays yours.",
-  },
+import type { I18nKey } from '@/lib/i18n/en';
+
+const SLIDE_META: { icon: string; color: string; titleKey: I18nKey; subKey: I18nKey }[] = [
+  { icon: 'zap', color: '#7C72FF', titleKey: 'onboarding.slide1Title', subKey: 'onboarding.slide1Sub' },
+  { icon: 'search', color: '#00D4FF', titleKey: 'onboarding.slide2Title', subKey: 'onboarding.slide2Sub' },
+  { icon: 'bell', color: '#FF375F', titleKey: 'onboarding.slide3Title', subKey: 'onboarding.slide3Sub' },
+  { icon: 'smartphone', color: '#FFD60A', titleKey: 'onboarding.slide4Title', subKey: 'onboarding.slide4Sub' },
+  { icon: 'shield', color: '#30D158', titleKey: 'onboarding.slide5Title', subKey: 'onboarding.slide5Sub' },
 ];
 
 export default function OnboardingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { completeOnboarding } = useScreenshots();
+  const { t } = useLocale();
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  const slides = useMemo(
+    () =>
+      SLIDE_META.map((s) => ({
+        icon: s.icon,
+        color: s.color,
+        title: t(s.titleKey),
+        subtitle: t(s.subKey),
+      })),
+    [t],
+  );
+
   function goNext() {
-    if (page < SLIDES.length - 1) {
+    if (page < slides.length - 1) {
       Haptics.selectionAsync();
       const next = page + 1;
       setPage(next);
@@ -82,7 +74,7 @@ export default function OnboardingScreen() {
   // Onboarding has no tab bar, just clear the device edge
   const botPad = Platform.OS === 'web' ? 40 : Math.max(insets.bottom, 16) + 16;
 
-  const slide = SLIDES[page];
+  const slide = slides[page];
 
   return (
     <Animated.View
@@ -97,17 +89,18 @@ export default function OnboardingScreen() {
         showsHorizontalScrollIndicator={false}
         style={{ flex: 1 }}
       >
-        {SLIDES.map((s, i) => (
+        {slides.map((s, i) => (
           <View key={i} style={[styles.slide, { width, paddingTop: topPad + 60 }]}>
-            {/* Glow blob */}
-            <View
-              style={[
-                styles.glowBlob,
-                { backgroundColor: s.color + '22', width: 220, height: 220, borderRadius: 110 },
-              ]}
-            />
-            <View style={[styles.iconCircle, { backgroundColor: s.color + '22' }]}>
-              <Feather name={s.icon as any} size={44} color={s.color} />
+            <View style={styles.iconArea}>
+              <View
+                style={[
+                  styles.glowBlob,
+                  { backgroundColor: s.color + '22' },
+                ]}
+              />
+              <View style={[styles.iconCircle, { backgroundColor: s.color + '22' }]}>
+                <Feather name={s.icon as any} size={44} color={s.color} />
+              </View>
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>{s.title}</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{s.subtitle}</Text>
@@ -117,7 +110,7 @@ export default function OnboardingScreen() {
 
       {/* Dots */}
       <View style={styles.dotsRow}>
-        {SLIDES.map((_, i) => (
+        {slides.map((_, i) => (
           <View
             key={i}
             style={[
@@ -142,13 +135,13 @@ export default function OnboardingScreen() {
           ]}
         >
           <Text style={styles.btnText}>
-            {page < SLIDES.length - 1 ? 'Continue' : 'Get Started — It\'s Free'}
+            {page < slides.length - 1 ? t('onboarding.continue') : t('onboarding.getStarted')}
           </Text>
           <Feather name="arrow-right" size={18} color="#fff" />
         </Pressable>
-        {page === SLIDES.length - 1 && (
+        {page === slides.length - 1 && (
           <Text style={[styles.privacyNote, { color: colors.mutedForeground }]}>
-            Your photos never leave your device
+            {t('onboarding.privacyNote')}
           </Text>
         )}
       </View>
@@ -166,10 +159,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     gap: 24,
   },
+  iconArea: {
+    width: 220,
+    height: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   glowBlob: {
     position: 'absolute',
-    top: '15%',
-    zIndex: 1,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
   },
   iconCircle: {
     width: 100,
@@ -178,7 +178,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    zIndex: 2,
   },
   title: {
     fontSize: 40,

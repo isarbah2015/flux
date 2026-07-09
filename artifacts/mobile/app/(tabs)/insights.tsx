@@ -1,23 +1,20 @@
-import React from 'react';
-import { FlatList, Platform, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useMemo } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
+import { useScreenInsets } from '@/hooks/useScreenInsets';
+import { premiumBillingSummary } from '@/lib/pricing';
+import { useLocale } from '@/context/LocaleContext';
+import { usePremium } from '@/context/PremiumContext';
 import { useScreenshots, type Insight } from '@/context/ScreenshotsContext';
 import InsightCard from '@/components/InsightCard';
 import { Feather } from '@expo/vector-icons';
 
-const SECTION_TITLES: Record<string, string> = {
-  price_drop: 'Price Drops',
-  price_watch: 'Watching',
-  promise: 'Promises',
-  calendar: 'Upcoming',
-};
-
-const SECTION_ICONS: Record<string, string> = {
-  price_drop: 'trending-down',
-  price_watch: 'eye',
-  promise: 'user-check',
-  calendar: 'calendar',
+const SECTION_META: Record<string, { title: string; icon: string; accent: string }> = {
+  price_drop: { title: 'Price Drops', icon: 'trending-down', accent: '#30D158' },
+  price_watch: { title: 'Watching', icon: 'eye', accent: '#5AC8FA' },
+  promise: { title: 'Promises', icon: 'user-check', accent: '#BF5AF2' },
+  calendar: { title: 'Upcoming', icon: 'calendar', accent: '#FFD60A' },
 };
 
 function groupInsights(insights: Insight[]): { type: string; data: Insight[] }[] {
@@ -32,69 +29,179 @@ function groupInsights(insights: Insight[]): { type: string; data: Insight[] }[]
 
 export default function InsightsScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const { topPad, bottomPad } = useScreenInsets();
+  const { t } = useLocale();
+  const { isPremium, startCheckout } = usePremium();
   const { getInsights, totalIndexed } = useScreenshots();
   const insights = getInsights();
   const groups = groupInsights(insights);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const botPad = Platform.OS === 'web' ? 148 : Math.max(insets.bottom, 8) + 98;
+  const stats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const ins of insights) {
+      counts[ins.type] = (counts[ins.type] ?? 0) + 1;
+    }
+    return counts;
+  }, [insights]);
+
+  const urgentCount = insights.filter((i) => i.urgent).length;
 
   type ListItem =
+    | { kind: 'hero' }
+    | { kind: 'premium' }
+    | { kind: 'stats' }
     | { kind: 'header'; type: string }
-    | { kind: 'insight'; insight: Insight };
+    | { kind: 'insight'; insight: Insight; index: number };
 
-  const listData: ListItem[] = [];
+  const listData: ListItem[] = [{ kind: 'hero' }];
+  if (!isPremium) listData.push({ kind: 'premium' });
+  if (insights.length > 0) listData.push({ kind: 'stats' });
+
+  let insightIndex = 0;
   for (const g of groups) {
     listData.push({ kind: 'header', type: g.type });
-    for (const ins of g.data) listData.push({ kind: 'insight', insight: ins });
+    for (const ins of g.data) {
+      listData.push({ kind: 'insight', insight: ins, index: insightIndex });
+      insightIndex += 1;
+    }
+  }
+
+  function renderPremiumBanner() {
+    return (
+      <Pressable
+        onPress={() => { void startCheckout(); }}
+        style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1, marginHorizontal: 20, marginBottom: 14 }]}
+      >
+        <LinearGradient
+          colors={['#7C72FF40', '#9B8FFF20', colors.card]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.premiumBanner, { borderColor: colors.primary + '40' }]}
+        >
+          <Feather name="lock" size={18} color={colors.primary} />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[styles.premiumTitle, { color: colors.foreground }]}>
+              Unlock price & promise insights
+            </Text>
+            <Text style={[styles.premiumSub, { color: colors.mutedForeground }]}>
+              Premium adds price-drop alerts, promise reminders, and calendar sync — {premiumBillingSummary()}.
+            </Text>
+          </View>
+          <Feather name="arrow-right" size={18} color={colors.primary} />
+        </LinearGradient>
+      </Pressable>
+    );
+  }
+
+  function renderHero() {
+    return (
+      <LinearGradient
+        colors={['#2A2450', '#16142A', colors.background]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.hero, { borderColor: colors.primary + '30' }]}
+      >
+        <View style={styles.heroTop}>
+          <View style={[styles.heroIcon, { backgroundColor: colors.primary + '25' }]}>
+            <Feather name="zap" size={22} color={colors.primary} />
+          </View>
+          <View style={styles.heroBadge}>
+            <Text style={[styles.heroBadgeText, { color: colors.primary }]}>
+              {urgentCount > 0 ? `${urgentCount} urgent` : 'Smart feed'}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.heroTitle, { color: colors.foreground }]}>{t('insights.title')}</Text>
+        <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
+          {t('insights.subtitle', { count: totalIndexed })}
+        </Text>
+        <View style={styles.heroCountRow}>
+          <Text style={[styles.heroCount, { color: colors.foreground }]}>{insights.length}</Text>
+          <Text style={[styles.heroCountLabel, { color: colors.mutedForeground }]}>
+            active insights
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  function renderStats() {
+    const chips = Object.entries(SECTION_META)
+      .filter(([type]) => (stats[type] ?? 0) > 0)
+      .map(([type, meta]) => ({ type, ...meta, count: stats[type] ?? 0 }));
+
+    return (
+      <View style={styles.statsRow}>
+        {chips.map((chip) => (
+          <View
+            key={chip.type}
+            style={[styles.statChip, { backgroundColor: chip.accent + '14', borderColor: chip.accent + '35' }]}
+          >
+            <Feather name={chip.icon as keyof typeof Feather.glyphMap} size={14} color={chip.accent} />
+            <Text style={[styles.statVal, { color: chip.accent }]}>{chip.count}</Text>
+            <Text style={[styles.statLbl, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {chip.title}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 16 }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Insights</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Smart alerts from {totalIndexed} screenshots
-        </Text>
-      </View>
-
       {insights.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={[styles.emptyIconWrap, { backgroundColor: colors.secondary }]}>
-            <Feather name="zap" size={30} color={colors.mutedForeground} />
+        <View style={{ flex: 1, paddingTop: topPad, paddingBottom: bottomPad }}>
+          {renderHero()}
+          <View style={styles.empty}>
+            <View style={[styles.emptyOrb, { backgroundColor: colors.secondary }]}>
+              <Feather name="activity" size={32} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t('insights.emptyTitle')}</Text>
+            <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
+              {totalIndexed === 0 ? t('insights.emptySubNoIndex') : t('insights.emptySub')}
+            </Text>
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No insights yet</Text>
-          <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-            {totalIndexed === 0
-              ? 'Grant photo access to start indexing.'
-              : 'Price drops, promises, and events appear here automatically.'}
-          </Text>
         </View>
       ) : (
         <FlatList
+          style={styles.list}
           data={listData}
-          keyExtractor={(item, i) =>
-            item.kind === 'header' ? `h_${item.type}` : item.insight.id
-          }
+          keyExtractor={(item, idx) => {
+            if (item.kind === 'hero') return 'hero';
+            if (item.kind === 'premium') return 'premium';
+            if (item.kind === 'stats') return 'stats';
+            if (item.kind === 'header') return `h_${item.type}`;
+            return item.insight.id;
+          }}
+          ListHeaderComponent={<View style={{ height: topPad }} />}
           renderItem={({ item }) => {
+            if (item.kind === 'hero') return renderHero();
+            if (item.kind === 'premium') return renderPremiumBanner();
+            if (item.kind === 'stats') return renderStats();
             if (item.kind === 'header') {
+              const meta = SECTION_META[item.type] ?? { title: item.type, icon: 'zap', accent: colors.primary };
               return (
                 <View style={styles.sectionHeader}>
-                  <Feather
-                    name={SECTION_ICONS[item.type] as any}
-                    size={13}
-                    color={colors.mutedForeground}
+                  <LinearGradient
+                    colors={[meta.accent + '30', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.sectionAccent}
                   />
-                  <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-                    {SECTION_TITLES[item.type] ?? item.type}
-                  </Text>
+                  <Feather name={meta.icon as keyof typeof Feather.glyphMap} size={14} color={meta.accent} />
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{meta.title}</Text>
+                  <View style={[styles.sectionCount, { backgroundColor: meta.accent + '20' }]}>
+                    <Text style={[styles.sectionCountText, { color: meta.accent }]}>
+                      {stats[item.type] ?? 0}
+                    </Text>
+                  </View>
                 </View>
               );
             }
-            return <InsightCard insight={item.insight} />;
+            return <InsightCard insight={item.insight} index={item.index} />;
           }}
-          contentContainerStyle={{ paddingBottom: botPad, paddingTop: 4 }}
+          contentContainerStyle={{ paddingBottom: bottomPad }}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -104,23 +211,76 @@ export default function InsightsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: 22, paddingBottom: 16, gap: 3 },
-  title: { fontSize: 30, fontFamily: 'DMSans_700Bold', letterSpacing: -1 },
-  subtitle: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
+  list: { flex: 1 },
+  hero: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    gap: 8,
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(124,114,255,0.15)',
+  },
+  heroBadgeText: { fontSize: 11, fontFamily: 'DMSans_700Bold', letterSpacing: 0.6 },
+  heroTitle: { fontSize: 28, fontFamily: 'DMSans_700Bold', letterSpacing: -0.8, marginTop: 4 },
+  heroSub: { fontSize: 13, fontFamily: 'DMSans_400Regular', lineHeight: 18 },
+  heroCountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 },
+  heroCount: { fontSize: 36, fontFamily: 'DMSans_700Bold', letterSpacing: -1 },
+  heroCountLabel: { fontSize: 13, fontFamily: 'DMSans_500Medium' },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  statChip: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  statVal: { fontSize: 20, fontFamily: 'DMSans_700Bold' },
+  statLbl: { fontSize: 11, fontFamily: 'DMSans_500Medium' },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: 22,
+    paddingBottom: 12,
+    overflow: 'hidden',
   },
-  sectionTitle: {
-    fontSize: 12,
-    fontFamily: 'DMSans_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  sectionAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 18,
+    bottom: 8,
+    width: 4,
+    borderRadius: 2,
   },
+  sectionTitle: { fontSize: 15, fontFamily: 'DMSans_700Bold', flex: 1 },
+  sectionCount: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  sectionCountText: { fontSize: 12, fontFamily: 'DMSans_700Bold' },
   empty: {
     flex: 1,
     alignItems: 'center',
@@ -128,10 +288,10 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: 40,
   },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 26,
+  emptyOrb: {
+    width: 88,
+    height: 88,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -142,4 +302,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  premiumBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+  premiumTitle: { fontSize: 15, fontFamily: 'DMSans_700Bold' },
+  premiumSub: { fontSize: 12, fontFamily: 'DMSans_400Regular', lineHeight: 17 },
 });

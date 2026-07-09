@@ -1,14 +1,22 @@
 import { classifyOnDevice } from '@/lib/on-device-classifier';
 import {
+  getAllLocalScreenshotRows,
   insertLocalScreenshot,
   newScreenshotId,
   type LocalScreenshotRow,
 } from '@/lib/local-db';
+import { notifyPriceDrop, schedulePromiseReminder } from '@/lib/notifications';
 import { ocrFromImageUri } from '@/lib/ocr-service';
+import { materializeImageToCache } from '@/lib/image-materialize';
+import { isPremiumCached } from '@/lib/premium-cache';
+import { reconcilePriceTracking } from '@/lib/price-watch';
+import { readImageBase64FromUri, resolveScreenshotDisplayUri } from '@/lib/screenshot-uri';
 
 export interface ProcessScreenshotInput {
   imageUri?: string | null;
+  imageBase64?: string | null;
   localAssetId?: string | null;
+  filename?: string | null;
   capturedAt?: string;
   /** Skip OCR when text is already known (e.g. user pasted in import screen). */
   extractedText?: string;
@@ -16,7 +24,6 @@ export interface ProcessScreenshotInput {
 
 /**
  * Flux on-device pipeline: OCR (Vision/ML Kit) → classify → SQLite.
- * No image bytes leave the device during this step.
  */
 export async function processScreenshotOnDevice(
   input: ProcessScreenshotInput,
@@ -25,18 +32,27 @@ export async function processScreenshotOnDevice(
     throw new Error('Provide an image or text to classify.');
   }
 
-  let extractedText = input.extractedText?.trim() ?? '';
-
-  if (!extractedText && input.imageUri) {
-    extractedText = await ocrFromImageUri(input.imageUri);
+  let imageUri = input.imageUri ?? null;
+  if (imageUri || input.imageBase64) {
+    const materialized = await materializeImageToCache(imageUri, input.imageBase64);
+    if (materialized) imageUri = materialized;
   }
 
-  const classification = classifyOnDevice(extractedText);
+  let extractedText = input.extractedText?.trim() ?? '';
 
-  const row: LocalScreenshotRow = {
+  if (!extractedText && imageUri) {
+    extractedText = await ocrFromImageUri(imageUri, input.imageBase64);
+  }
+
+  const classification = classifyOnDevice(extractedText, {
+    filename: input.filename,
+    capturedAt: input.capturedAt,
+  });
+
+  let row: LocalScreenshotRow = {
     id: newScreenshotId(),
     localAssetId: input.localAssetId ?? null,
-    imageUri: input.imageUri ?? null,
+    imageUri,
     capturedAt: input.capturedAt ?? new Date().toISOString(),
     category: classification.category,
     tags: classification.tags,
@@ -47,14 +63,72 @@ export async function processScreenshotOnDevice(
     synced: 0,
   };
 
+  const existing = await getAllLocalScreenshotRows();
+  const { metadata, alerts } = reconcilePriceTracking(row, existing);
+  row = { ...row, metadata };
+
   await insertLocalScreenshot(row);
+
+  if (row.metadata.promise && isPremiumCached()) {
+    await schedulePromiseReminder(localRowToScreenshot(row));
+  }
+
+  if (isPremiumCached()) {
+    for (const alert of alerts) {
+      await notifyPriceDrop(alert);
+    }
+  }
+
   return row;
+}
+
+/** Re-run OCR for rows that were indexed before OCR was available. */
+export async function reprocessLocalScreenshotOcr(
+  row: LocalScreenshotRow,
+): Promise<LocalScreenshotRow | null> {
+  if (row.extractedText.trim()) return row;
+
+  const displayUri = await resolveScreenshotDisplayUri(row.imageUri, row.localAssetId);
+  if (!displayUri) return row;
+
+  const base64 = await readImageBase64FromUri(displayUri);
+  let extractedText = await ocrFromImageUri(displayUri, base64);
+
+  if (!extractedText.trim()) {
+    const classification = classifyOnDevice('', { capturedAt: row.capturedAt });
+    const patched: LocalScreenshotRow = {
+      ...row,
+      imageUri: displayUri,
+      category: classification.category,
+      tags: classification.tags,
+      summary: classification.summary,
+      colorHex: classification.colorHex,
+      metadata: classification.metadata,
+    };
+    await insertLocalScreenshot(patched);
+    return patched;
+  }
+
+  const classification = classifyOnDevice(extractedText, { capturedAt: row.capturedAt });
+  const patched: LocalScreenshotRow = {
+    ...row,
+    imageUri: displayUri,
+    category: classification.category,
+    tags: classification.tags,
+    extractedText: classification.extractedText,
+    summary: classification.summary,
+    colorHex: classification.colorHex,
+    metadata: classification.metadata,
+  };
+  await insertLocalScreenshot(patched);
+  return patched;
 }
 
 export function localRowToScreenshot(row: LocalScreenshotRow) {
   return {
     id: row.id,
     imageUri: row.imageUri,
+    localAssetId: row.localAssetId,
     capturedAt: row.capturedAt,
     category: row.category,
     tags: row.tags,

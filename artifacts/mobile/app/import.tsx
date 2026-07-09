@@ -26,7 +26,6 @@ export default function ImportScreen() {
   const { addScreenshot, isImporting } = useScreenshots();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -39,18 +38,17 @@ export default function ImportScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.8,
-      base64: true,
+      quality: 0.65,
+      allowsMultipleSelection: false,
     });
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
-      setImageBase64(result.assets[0].base64 ?? null);
       Haptics.selectionAsync();
     }
   }
 
   async function handleImport() {
-    if (!imageBase64 && !text.trim()) {
+    if (!imageUri && !text.trim()) {
       setError('Choose a screenshot or add its text so Flux can classify it.');
       return;
     }
@@ -99,10 +97,10 @@ export default function ImportScreen() {
           </Pressable>
 
           <Text style={[styles.label, { color: colors.foreground }]}>
-            Screenshot text {imageBase64 ? '(optional)' : ''}
+            Screenshot text {imageUri ? '(optional)' : ''}
           </Text>
           <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-            {imageBase64
+            {imageUri
               ? 'Flux will read the image automatically. Add or correct text here if you like.'
               : 'Paste or type the text in the screenshot so Flux can detect the category, prices, promises, and events.'}
           </Text>

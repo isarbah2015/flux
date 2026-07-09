@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -19,6 +20,10 @@ const IS_EXPO_GO = isExpoGo;
 let googleConfigured = false;
 
 async function loadGoogleSignin() {
+  if (IS_EXPO_GO) {
+    return import('@/lib/google-sign-in-stub');
+  }
+  // Direct import — same as when Google Sign-In last worked on dev builds.
   return import('@react-native-google-signin/google-signin');
 }
 
@@ -37,7 +42,11 @@ async function ensureGoogleConfigured(): Promise<boolean> {
     });
     googleConfigured = true;
     return true;
-  } catch {
+  } catch (err) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.error('[Flux] GoogleSignin.configure failed:', err);
+    }
     return false;
   }
 }
@@ -57,15 +66,20 @@ function googleNativeErrorMessage(e: unknown): string {
   return msg || 'Google sign-in failed';
 }
 
+const GUEST_MODE_KEY = 'flux_guest_mode';
+
 interface AuthContextType {
   authEnabled: boolean;
   isReady: boolean;
+  guestModeChecked: boolean;
   isExpoGo: boolean;
   googleSignInAvailable: boolean;
+  guestMode: boolean;
   user: User | null;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  continueAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -83,17 +97,32 @@ setAuthTokenGetter(async () => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(auth?.currentUser ?? null);
   const [isReady, setIsReady] = useState(!isFirebaseConfigured);
+  const [guestMode, setGuestMode] = useState(false);
+  const [guestModeChecked, setGuestModeChecked] = useState(!isFirebaseConfigured);
+
+  useEffect(() => {
+    void (async () => {
+      const stored = await AsyncStorage.getItem(GUEST_MODE_KEY);
+      if (stored === '1') setGuestMode(true);
+      setGuestModeChecked(true);
+    })();
+  }, []);
 
   useEffect(() => {
     if (!auth) {
       setIsReady(true);
       return;
     }
+    const timeout = setTimeout(() => setIsReady(true), 6000);
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setIsReady(true);
+      clearTimeout(timeout);
     });
-    return unsub;
+    return () => {
+      unsub();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
@@ -101,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (IS_EXPO_GO) {
       throw new Error(
-        'Google Sign-In needs an installed app build (not Expo Go).\n\nUse email/password here, or run: npx expo run:ios / run:android',
+        'Google Sign-In needs an installed app build (not Expo Go).\n\nUse email/password here, or run: npx expo run:android',
       );
     }
 
@@ -111,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const ok = await ensureGoogleConfigured();
     if (!ok) {
-      throw new Error('Google Sign-In is unavailable in this build.');
+      throw new Error('Google Sign-In failed to initialize. Rebuild the app (npx expo run:android).');
     }
 
     const { GoogleSignin, isSuccessResponse } = await loadGoogleSignin();
@@ -129,9 +158,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+    await AsyncStorage.removeItem(GUEST_MODE_KEY);
+    setGuestMode(false);
+  }, []);
+
+  const continueAsGuest = useCallback(async () => {
+    await AsyncStorage.setItem(GUEST_MODE_KEY, '1');
+    setGuestMode(true);
   }, []);
 
   const signOut = useCallback(async () => {
+    await AsyncStorage.removeItem(GUEST_MODE_KEY);
+    setGuestMode(false);
     if (!auth) return;
     try {
       const { GoogleSignin } = await loadGoogleSignin();
@@ -147,21 +185,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       authEnabled: isFirebaseConfigured,
       isReady,
+      guestModeChecked,
       isExpoGo: IS_EXPO_GO,
-      googleSignInAvailable: isGoogleSignInConfigured(),
+      googleSignInAvailable: isGoogleSignInConfigured() && !IS_EXPO_GO,
+      guestMode,
       user,
       async signInWithEmail(email, password) {
         if (!auth) throw new Error('Firebase auth is not configured.');
         await signInWithEmailAndPassword(auth, email, password);
+        await AsyncStorage.removeItem(GUEST_MODE_KEY);
+        setGuestMode(false);
       },
       async signUpWithEmail(email, password) {
         if (!auth) throw new Error('Firebase auth is not configured.');
         await createUserWithEmailAndPassword(auth, email, password);
+        await AsyncStorage.removeItem(GUEST_MODE_KEY);
+        setGuestMode(false);
       },
       signInWithGoogle,
+      continueAsGuest,
       signOut,
     }),
-    [isReady, signInWithGoogle, signOut, user],
+    [continueAsGuest, guestMode, guestModeChecked, isReady, signInWithGoogle, signOut, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

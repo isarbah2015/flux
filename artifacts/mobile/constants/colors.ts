@@ -4,6 +4,9 @@ export const CATEGORY_COLORS = {
   travel: '#00D4FF',
   receipt: '#30D158',
   conversation: '#FF375F',
+  ideas: '#BF5AF2',
+  finance: '#FFD60A',
+  food: '#FF6482',
   unknown: '#636384',
 } as const;
 
@@ -11,8 +14,11 @@ export const CATEGORY_LABELS = {
   shopping: 'Shopping',
   work: 'Work',
   travel: 'Travel',
-  receipt: 'Receipt',
-  conversation: 'Conversation',
+  receipt: 'Receipts',
+  conversation: 'Chats',
+  ideas: 'Ideas',
+  finance: 'Finance',
+  food: 'Food',
   unknown: 'Other',
 } as const;
 
@@ -22,7 +28,10 @@ export const CATEGORY_ICONS: Record<string, string> = {
   travel: 'map-pin',
   receipt: 'file-text',
   conversation: 'message-circle',
-  unknown: 'help-circle',
+  ideas: 'zap',
+  finance: 'dollar-sign',
+  food: 'coffee',
+  unknown: 'grid',
 };
 
 const colors = {

@@ -36,7 +36,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { profile, saveProfile } = useProfile();
-  const { isPremium } = usePremium();
+  const { isPremium, isPaidPremium, isOnTrial, trialDaysLeft } = usePremium();
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? user?.displayName ?? '');
   const [profileId, setProfileId] = useState(profile?.profileId ?? '');
@@ -97,8 +97,8 @@ export default function ProfileScreen() {
           <Text style={[styles.heroName, { color: colors.foreground }]}>{name}</Text>
           <Text style={[styles.heroEmail, { color: colors.mutedForeground }]}>{user?.email}</Text>
           <View style={[styles.planPill, { backgroundColor: isPremium ? colors.primary + '22' : colors.secondary }]}>
-            <Text style={{ color: isPremium ? colors.primary : colors.mutedForeground, fontFamily: 'DMSans_600SemiBold', fontSize: 12 }}>
-              {isPremium ? 'Premium' : 'Free plan'}
+            <Text style={{ color: isPremium ? (isOnTrial && !isPaidPremium ? '#FFD60A' : colors.primary) : colors.mutedForeground, fontFamily: 'DMSans_600SemiBold', fontSize: 12 }}>
+              {isPaidPremium ? 'Premium' : isOnTrial ? `Trial · ${trialDaysLeft}d left` : 'Free plan'}
             </Text>
           </View>
         </View>

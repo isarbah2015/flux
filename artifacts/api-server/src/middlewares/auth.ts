@@ -7,6 +7,7 @@ declare global {
   namespace Express {
     interface Request {
       userId?: string;
+      userEmail?: string;
     }
   }
 }
@@ -49,6 +50,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
       return;
     }
     req.userId = payload.sub;
+    req.userEmail = typeof payload.email === "string" ? payload.email : undefined;
     next();
   } catch (err) {
     logger.warn({ err }, "Firebase token verification failed");
@@ -60,4 +62,8 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
 export function userId(req: { userId?: string }): string {
   if (!req.userId) throw new Error("userId accessed on an unauthenticated request");
   return req.userId;
+}
+
+export function userEmail(req: { userEmail?: string }): string | undefined {
+  return req.userEmail;
 }

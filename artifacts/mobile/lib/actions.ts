@@ -1,19 +1,11 @@
-import { Alert, Linking, Platform, Share } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import type { Screenshot } from '@/context/ScreenshotsContext';
+import { addScreenshotToCalendar } from '@/lib/calendar-sync';
+import { schedulePromiseReminder } from '@/lib/notifications';
+import { shareScreenshot } from '@/lib/share-screenshot';
 
-const REMINDERS_KEY = 'flux_reminders';
-
-export async function shareScreenshot(screenshot: Screenshot): Promise<void> {
-  Haptics.selectionAsync();
-  const message = `${screenshot.summary}\n\n${screenshot.extractedText.slice(0, 280)}`;
-  await Share.share({
-    title: screenshot.summary,
-    message,
-    ...(Platform.OS === 'ios' ? { url: screenshot.imageUri ?? undefined } : {}),
-  });
-}
+export { shareScreenshot };
 
 export async function openProductDeal(screenshot: Screenshot): Promise<void> {
   const pt = screenshot.priceTracking;
@@ -32,17 +24,15 @@ export async function openProductDeal(screenshot: Screenshot): Promise<void> {
 export async function setPromiseReminder(screenshot: Screenshot): Promise<void> {
   const p = screenshot.promise;
   if (!p) return;
+
+  const scheduled = await schedulePromiseReminder(screenshot);
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-  const reminders = JSON.parse((await AsyncStorage.getItem(REMINDERS_KEY)) ?? '[]') as string[];
-  if (!reminders.includes(screenshot.id)) {
-    reminders.push(screenshot.id);
-    await AsyncStorage.setItem(REMINDERS_KEY, JSON.stringify(reminders));
-  }
-
   Alert.alert(
-    'Reminder saved',
-    `We'll nudge you to follow up with ${p.from} before ${p.deadline}.`,
+    scheduled ? 'Reminder scheduled' : 'Reminder saved',
+    scheduled
+      ? `You'll get a push notification before the deadline to follow up with ${p.from}.`
+      : `Reminder saved for ${p.from}. Enable notifications in Settings for alerts.`,
     [{ text: 'OK' }],
   );
 }
@@ -52,18 +42,14 @@ export async function addToCalendar(screenshot: Screenshot): Promise<void> {
   if (!ev) return;
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-  const title = encodeURIComponent(ev.title);
-  const details = encodeURIComponent(screenshot.summary);
-  const location = encodeURIComponent(ev.location ?? '');
-  const date = ev.date.replace(/-/g, '');
-  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${date}/${date}`;
-
-  const ok = await Linking.canOpenURL(url);
-  if (!ok) {
+  const result = await addScreenshotToCalendar(screenshot);
+  if (result === 'native') {
+    Alert.alert('Added to calendar', `${ev.title} is on your device calendar.`);
+  } else if (result === 'web') {
+    Alert.alert('Opening Google Calendar', 'Complete the event in your browser.');
+  } else {
     Alert.alert('Calendar', `${ev.title}\n${ev.date}${ev.time ? ` · ${ev.time}` : ''}`);
-    return;
   }
-  await Linking.openURL(url);
 }
 
 export function openPrivacyPolicy(): void {

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { isPaystackConfigured, paystackMode } from "./lib/paystack";
 
 const rawPort = process.env["PORT"];
 
@@ -23,5 +24,13 @@ app.listen(port, host, (err) => {
     process.exit(1);
   }
 
-  logger.info({ port, host }, "Server listening");
+  logger.info(
+    {
+      port,
+      host,
+      paystackConfigured: isPaystackConfigured(),
+      paystackMode: paystackMode(),
+    },
+    "Server listening",
+  );
 });

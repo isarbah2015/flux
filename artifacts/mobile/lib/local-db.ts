@@ -103,6 +103,7 @@ function rowToScreenshot(row: LocalScreenshotRow): Screenshot {
   return {
     id: row.id,
     imageUri: row.imageUri,
+    localAssetId: row.localAssetId,
     capturedAt: row.capturedAt,
     category: row.category,
     tags: row.tags,
@@ -186,10 +187,68 @@ export async function getAllLocalScreenshots(): Promise<Screenshot[]> {
   return rows.map((r) => rowToScreenshot(parseRow(r)));
 }
 
+export async function getAllLocalScreenshotRows(): Promise<LocalScreenshotRow[]> {
+  if (!supportsLocalDb) return [];
+  const db = await getDb();
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `SELECT * FROM screenshots ORDER BY captured_at DESC`,
+  );
+  return rows.map((r) => parseRow(r));
+}
+
 export async function markLocalSynced(id: string): Promise<void> {
   if (!supportsLocalDb) return;
   const db = await getDb();
   await db.runAsync(`UPDATE screenshots SET synced = 1 WHERE id = ?`, id);
+}
+
+export interface LocalScreenshotApiPatch {
+  extractedText: string;
+  category: Category;
+  summary: string;
+  tags: string[];
+  colorHex: string;
+  metadata: ScreenshotMetadata;
+}
+
+export async function updateLocalScreenshotFromApi(
+  id: string,
+  patch: LocalScreenshotApiPatch,
+): Promise<void> {
+  if (!supportsLocalDb) return;
+  const db = await getDb();
+  const metadataJson = JSON.stringify(patch.metadata);
+  const tagsJson = JSON.stringify(patch.tags);
+
+  await db.runAsync(
+    `UPDATE screenshots
+     SET extracted_text = ?, category = ?, summary = ?, tags = ?, color_hex = ?, metadata = ?, synced = 1
+     WHERE id = ?`,
+    patch.extractedText,
+    patch.category,
+    patch.summary,
+    tagsJson,
+    patch.colorHex,
+    metadataJson,
+    id,
+  );
+
+  if (ftsEnabled) {
+    try {
+      await db.runAsync(`DELETE FROM screenshots_fts WHERE screenshot_id = ?`, id);
+      await db.runAsync(
+        `INSERT INTO screenshots_fts (screenshot_id, extracted_text, summary, tags, category)
+         VALUES (?, ?, ?, ?, ?)`,
+        id,
+        patch.extractedText,
+        patch.summary,
+        tagsJson,
+        patch.category,
+      );
+    } catch {
+      ftsEnabled = false;
+    }
+  }
 }
 
 /** FTS5 full-text search — on-device, no server. */
@@ -231,6 +290,19 @@ export async function searchLocalScreenshots(query: string): Promise<Screenshot[
     like,
   );
   return rows.map((r) => rowToScreenshot(parseRow(r)));
+}
+
+export async function deleteLocalScreenshot(id: string): Promise<void> {
+  if (!supportsLocalDb) return;
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM screenshots WHERE id = ?`, id);
+  if (ftsEnabled) {
+    try {
+      await db.runAsync(`DELETE FROM screenshots_fts WHERE screenshot_id = ?`, id);
+    } catch {
+      ftsEnabled = false;
+    }
+  }
 }
 
 export function newScreenshotId(): string {

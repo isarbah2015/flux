@@ -1,12 +1,16 @@
 /**
- * On-device OCR using Apple Vision (iOS) / ML Kit (Android).
- *
- * `expo-text-extractor` is a native module and is ONLY present in a development
- * build. In Expo Go the native side is missing and a static `import` of the
- * package throws at bundle-load time, taking the whole app down. We therefore
- * resolve it lazily inside a try/catch (documented exception to no-inline-imports)
- * and degrade gracefully to empty OCR text when it is unavailable.
+ * On-device OCR via ExpoTextExtractor (ML Kit / Vision).
+ * Uses requireOptionalNativeModule — NativeModules does not work with New Architecture.
  */
+
+import { requireOptionalNativeModule } from 'expo';
+import { supportsOnDeviceOcr } from '@/lib/runtime';
+import { materializeImageToCache } from '@/lib/image-materialize';
+
+type NativeExtractor = {
+  isSupported?: boolean;
+  extractTextFromImage: (uri: string) => Promise<string[]>;
+};
 
 type TextExtractor = {
   isSupported: boolean;
@@ -15,39 +19,60 @@ type TextExtractor = {
 
 let cachedModule: TextExtractor | null | undefined;
 
-import { supportsOnDeviceOcr } from '@/lib/runtime';
+function wireUri(uri: string): string {
+  if (uri.startsWith('content://')) return uri;
+  return uri.replace('file://', '');
+}
 
 function getExtractor(): TextExtractor | null {
   if (!supportsOnDeviceOcr) return null;
   if (cachedModule !== undefined) return cachedModule;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cachedModule = require('expo-text-extractor') as TextExtractor;
-  } catch {
-    cachedModule = null;
+
+  cachedModule = null;
+  const native = requireOptionalNativeModule<NativeExtractor>('ExpoTextExtractor');
+  if (!native || typeof native.extractTextFromImage !== 'function') {
+    return null;
   }
+
+  cachedModule = {
+    isSupported: native.isSupported !== false,
+    extractTextFromImage: async (uri: string) => native.extractTextFromImage(wireUri(uri)),
+  };
   return cachedModule;
 }
 
-export async function ocrFromImageUri(uri: string): Promise<string> {
-  const extractor = getExtractor();
+export function isOcrNativeLinked(): boolean {
+  return getExtractor() !== null;
+}
 
-  if (!extractor || !extractor.isSupported) {
-    if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.warn('[Flux OCR] expo-text-extractor unavailable — use a dev build for on-device OCR.');
-    }
-    return '';
-  }
-
+async function tryExtract(extractor: TextExtractor, uri: string): Promise<string> {
   try {
     const lines = await extractor.extractTextFromImage(uri);
     return lines.join('\n').trim();
-  } catch (err) {
-    if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.warn('[Flux OCR] extractTextFromImage failed:', err);
-    }
+  } catch {
     return '';
   }
+}
+
+export async function ocrFromImageUri(uri: string, base64?: string | null): Promise<string> {
+  const extractor = getExtractor();
+  if (!extractor?.isSupported) {
+    return '';
+  }
+
+  const candidates: string[] = [];
+  const clean = uri?.split('#')[0];
+  if (clean) candidates.push(clean);
+
+  const materialized = await materializeImageToCache(uri, base64);
+  if (materialized && !candidates.includes(materialized)) {
+    candidates.push(materialized);
+  }
+
+  for (const candidate of candidates) {
+    const text = await tryExtract(extractor, candidate);
+    if (text) return text;
+  }
+
+  return '';
 }

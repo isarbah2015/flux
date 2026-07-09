@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 
-/** True when running inside the Expo Go client (not a dev/production build). */
-export const isExpoGo = Constants.appOwnership === 'expo';
+/** True when running inside the Expo Go store client (not a dev/production build). */
+export const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
 /**
  * On-device SQLite + FTS. Disabled in Expo Go — the module can hard-crash Hermes

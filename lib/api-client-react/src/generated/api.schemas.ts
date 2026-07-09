@@ -22,6 +22,9 @@ export const Category = {
   travel: 'travel',
   receipt: 'receipt',
   conversation: 'conversation',
+  ideas: 'ideas',
+  finance: 'finance',
+  food: 'food',
   unknown: 'unknown',
 } as const;
 

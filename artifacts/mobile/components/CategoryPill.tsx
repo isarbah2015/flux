@@ -1,115 +1,72 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from '@/constants/colors';
-import type { Category } from '@/context/ScreenshotsContext';
+import { useLocale } from '@/context/LocaleContext';
+import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/colors';
+import type { FilterCategory } from '@/constants/categories';
 import * as Haptics from 'expo-haptics';
-
-type FilterCategory = Category | 'all';
 
 interface Props {
   value: FilterCategory;
   active: boolean;
+  count?: number;
+  dimmed?: boolean;
   onPress: () => void;
 }
 
-// Lighten a hex color by mixing it toward white
-function lighten(hex: string, amount = 0.35): string {
-  const n = parseInt(hex.slice(1), 16);
-  const r = Math.min(255, Math.round(((n >> 16) & 0xff) + (255 - ((n >> 16) & 0xff)) * amount));
-  const g = Math.min(255, Math.round(((n >> 8)  & 0xff) + (255 - ((n >> 8)  & 0xff)) * amount));
-  const b = Math.min(255, Math.round(( n        & 0xff) + (255 - ( n        & 0xff)) * amount));
-  return `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
-}
-
-export default function CategoryPill({ value, active, onPress }: Props) {
+export default function CategoryPill({ value, active, count = 0, dimmed = false, onPress }: Props) {
   const colors = useColors();
+  const { t } = useLocale();
 
-  const label  = value === 'all' ? 'All'    : CATEGORY_LABELS[value];
-  const icon   = value === 'all' ? 'layers' : CATEGORY_ICONS[value];
+  const label = t(value === 'all' ? 'category.all' : (`category.${value}` as 'category.shopping'));
+  const icon = value === 'all' ? 'layers' : CATEGORY_ICONS[value];
   const accent = value === 'all' ? colors.primary : CATEGORY_COLORS[value];
-  const light  = lighten(accent, 0.3);
-
-  // Native-driver opacity cross-fade between two rendered states
-  const fadeActive = useRef(new Animated.Value(active ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.spring(fadeActive, {
-      toValue: active ? 1 : 0,
-      useNativeDriver: true,
-      speed: 30,
-      bounciness: 4,
-    }).start();
-  }, [active]);
-
-  const fadeInactive = fadeActive.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
+  const showCount = value !== 'all' && count > 0;
 
   return (
     <Pressable
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => {
+        Haptics.selectionAsync();
+        onPress();
+      }}
       style={({ pressed }) => [
         styles.hitArea,
-        pressed && { opacity: 0.75, transform: [{ scale: 0.93 }] },
+        dimmed && !active && styles.dimmed,
+        pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
       ]}
     >
-      <View style={styles.pillBase}>
-
-        {/* ── INACTIVE layer ── */}
-        <Animated.View
-          pointerEvents={active ? 'none' : 'auto'}
-          style={[StyleSheet.absoluteFill, styles.layer, styles.inactiveLayer,
-            { borderColor: colors.border + '70',
-              backgroundColor: colors.card,
-              opacity: fadeInactive },
-          ]}
+      {active ? (
+        <LinearGradient
+          colors={[accent, accent + 'CC']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.pill, styles.pillActive, { shadowColor: accent }]}
         >
-          <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
-            <Feather name={icon as any} size={11} color={colors.mutedForeground} />
-          </View>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>
-        </Animated.View>
-
-        {/* ── ACTIVE layer ── */}
-        <Animated.View
-          pointerEvents={active ? 'auto' : 'none'}
-          style={[StyleSheet.absoluteFill, styles.layer,
-            { opacity: fadeActive,
-              // colored glow
-              shadowColor: accent,
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.55,
-              shadowRadius: 14,
-              elevation: 10,
-            } as any,
-          ]}
-        >
-          <LinearGradient
-            colors={[light, accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[StyleSheet.absoluteFill, styles.gradientLayer]}
-          />
-          {/* subtle inner border for depth */}
-          <View style={[StyleSheet.absoluteFill, styles.activeBorder]} />
-
-          <View style={[styles.iconWrap, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-            <Feather name={icon as any} size={11} color="#fff" />
-          </View>
-          <Text style={[styles.label, styles.activeLabel]}>{label}</Text>
-        </Animated.View>
-
-        {/* Invisible spacer so the pill keeps its size */}
-        <View style={styles.spacer}>
-          <View style={styles.iconWrap} />
-          <Text style={styles.label}>{label}</Text>
+          <Feather name={icon as keyof typeof Feather.glyphMap} size={11} color="#fff" />
+          <Text style={styles.labelActive} numberOfLines={1}>
+            {label}
+          </Text>
+          {showCount ? (
+            <View style={styles.countActive}>
+              <Text style={styles.countTextActive}>{count}</Text>
+            </View>
+          ) : null}
+        </LinearGradient>
+      ) : (
+        <View style={[styles.pill, styles.pillInactive, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather name={icon as keyof typeof Feather.glyphMap} size={11} color={colors.mutedForeground} />
+          <Text style={[styles.label, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {label}
+          </Text>
+          {showCount ? (
+            <View style={[styles.count, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.countText, { color: colors.mutedForeground }]}>{count}</Text>
+            </View>
+          ) : null}
         </View>
-
-      </View>
+      )}
     </Pressable>
   );
 }
@@ -118,53 +75,66 @@ const styles = StyleSheet.create({
   hitArea: {
     marginRight: 8,
   },
-  pillBase: {
-    // sizing container — layers are absolute on top
+  dimmed: {
+    opacity: 0.42,
   },
-  layer: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 26,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    height: 36,
   },
-  inactiveLayer: {
-    borderWidth: 1.5,
-  },
-  gradientLayer: {
-    borderRadius: 26,
-  },
-  activeBorder: {
-    borderRadius: 26,
+  pillInactive: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.30)',
   },
-  iconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pillActive: {
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 4,
   },
   label: {
-    fontSize: 13,
+    fontSize: 12,
+    fontFamily: 'DMSans_600SemiBold',
+    includeFontPadding: false,
+    maxWidth: 88,
+  },
+  labelActive: {
+    fontSize: 12,
     fontFamily: 'DMSans_700Bold',
-    letterSpacing: 0.1,
-  },
-  activeLabel: {
     color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.18)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    includeFontPadding: false,
+    maxWidth: 88,
   },
-  // invisible sizer
-  spacer: {
-    flexDirection: 'row',
+  count: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    opacity: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  countActive: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  countText: {
+    fontSize: 10,
+    fontFamily: 'DMSans_700Bold',
+    includeFontPadding: false,
+  },
+  countTextActive: {
+    fontSize: 10,
+    fontFamily: 'DMSans_700Bold',
+    color: '#fff',
+    includeFontPadding: false,
   },
 });
