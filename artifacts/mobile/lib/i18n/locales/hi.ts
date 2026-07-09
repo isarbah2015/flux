@@ -66,6 +66,16 @@ export const hi: Record<I18nKey, string> = {
   'insights.emptySub': 'कीमत में गिरावट, वादे और इवेंट यहाँ स्वचालित रूप से दिखेंगे।',
   'insights.emptySubNoIndex': 'अनुक्रमण शुरू करने के लिए फ़ोटो एक्सेस दें।',
 
+  'insights.section.price_drop': 'कीमत में गिरावट',
+  'insights.section.price_watch': 'निगरानी',
+  'insights.section.promise': 'वादे',
+  'insights.section.calendar': 'आगामी',
+
+  'detail.notFound': 'नहीं मिला',
+  'detail.deleteTitle': 'स्क्रीनशॉट हटाएँ?',
+  'detail.deleteBody': 'यह इस डिवाइस की लाइब्रेरी से हटा दिया जाएगा।',
+  'detail.delete': 'हटाएँ',
+
   'calendar.title': 'कैलेंडर',
   'calendar.subtitle': 'आपके स्क्रीनशॉट में पाए गए इवेंट',
   'calendar.empty': 'अभी कोई इवेंट नहीं',

@@ -66,6 +66,16 @@ export const ar: Record<I18nKey, string> = {
   'insights.emptySub': 'تظهر انخفاضات الأسعار والوعود والأحداث هنا تلقائياً.',
   'insights.emptySubNoIndex': 'امنح الوصول للصور لبدء الفهرسة.',
 
+  'insights.section.price_drop': 'انخفاض الأسعار',
+  'insights.section.price_watch': 'مراقبة',
+  'insights.section.promise': 'وعود',
+  'insights.section.calendar': 'قادمة',
+
+  'detail.notFound': 'غير موجود',
+  'detail.deleteTitle': 'حذف لقطة الشاشة؟',
+  'detail.deleteBody': 'ستُزال من مكتبتك على هذا الجهاز.',
+  'detail.delete': 'حذف',
+
   'calendar.title': 'التقويم',
   'calendar.subtitle': 'أحداث مكتشفة في لقطات الشاشة',
   'calendar.empty': 'لا توجد أحداث بعد',

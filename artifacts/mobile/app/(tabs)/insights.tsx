@@ -10,11 +10,18 @@ import { useScreenshots, type Insight } from '@/context/ScreenshotsContext';
 import InsightCard from '@/components/InsightCard';
 import { Feather } from '@expo/vector-icons';
 
-const SECTION_META: Record<string, { title: string; icon: string; accent: string }> = {
-  price_drop: { title: 'Price Drops', icon: 'trending-down', accent: '#30D158' },
-  price_watch: { title: 'Watching', icon: 'eye', accent: '#5AC8FA' },
-  promise: { title: 'Promises', icon: 'user-check', accent: '#BF5AF2' },
-  calendar: { title: 'Upcoming', icon: 'calendar', accent: '#FFD60A' },
+const SECTION_KEYS = {
+  price_drop: 'insights.section.price_drop',
+  price_watch: 'insights.section.price_watch',
+  promise: 'insights.section.promise',
+  calendar: 'insights.section.calendar',
+} as const;
+
+const SECTION_ICONS: Record<string, { icon: string; accent: string }> = {
+  price_drop: { icon: 'trending-down', accent: '#30D158' },
+  price_watch: { icon: 'eye', accent: '#5AC8FA' },
+  promise: { icon: 'user-check', accent: '#BF5AF2' },
+  calendar: { icon: 'calendar', accent: '#FFD60A' },
 };
 
 function groupInsights(insights: Insight[]): { type: string; data: Insight[] }[] {
@@ -126,9 +133,14 @@ export default function InsightsScreen() {
   }
 
   function renderStats() {
-    const chips = Object.entries(SECTION_META)
+    const chips = Object.entries(SECTION_ICONS)
       .filter(([type]) => (stats[type] ?? 0) > 0)
-      .map(([type, meta]) => ({ type, ...meta, count: stats[type] ?? 0 }));
+      .map(([type, meta]) => ({
+        type,
+        ...meta,
+        title: t(SECTION_KEYS[type as keyof typeof SECTION_KEYS] ?? 'insights.title'),
+        count: stats[type] ?? 0,
+      }));
 
     return (
       <View style={styles.statsRow}>
@@ -180,19 +192,21 @@ export default function InsightsScreen() {
             if (item.kind === 'premium') return renderPremiumBanner();
             if (item.kind === 'stats') return renderStats();
             if (item.kind === 'header') {
-              const meta = SECTION_META[item.type] ?? { title: item.type, icon: 'zap', accent: colors.primary };
+              const icons = SECTION_ICONS[item.type] ?? { icon: 'zap', accent: colors.primary };
+              const titleKey = SECTION_KEYS[item.type as keyof typeof SECTION_KEYS];
+              const title = titleKey ? t(titleKey) : item.type;
               return (
                 <View style={styles.sectionHeader}>
                   <LinearGradient
-                    colors={[meta.accent + '30', 'transparent']}
+                    colors={[icons.accent + '30', 'transparent']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.sectionAccent}
                   />
-                  <Feather name={meta.icon as keyof typeof Feather.glyphMap} size={14} color={meta.accent} />
-                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{meta.title}</Text>
-                  <View style={[styles.sectionCount, { backgroundColor: meta.accent + '20' }]}>
-                    <Text style={[styles.sectionCountText, { color: meta.accent }]}>
+                  <Feather name={icons.icon as keyof typeof Feather.glyphMap} size={14} color={icons.accent} />
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{title}</Text>
+                  <View style={[styles.sectionCount, { backgroundColor: icons.accent + '20' }]}>
+                    <Text style={[styles.sectionCountText, { color: icons.accent }]}>
                       {stats[item.type] ?? 0}
                     </Text>
                   </View>

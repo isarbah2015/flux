@@ -64,6 +64,16 @@ export const en = {
   'insights.emptySub': 'Price drops, promises, and events appear here automatically.',
   'insights.emptySubNoIndex': 'Grant photo access to start indexing.',
 
+  'insights.section.price_drop': 'Price Drops',
+  'insights.section.price_watch': 'Watching',
+  'insights.section.promise': 'Promises',
+  'insights.section.calendar': 'Upcoming',
+
+  'detail.notFound': 'Not found',
+  'detail.deleteTitle': 'Delete screenshot?',
+  'detail.deleteBody': 'This removes it from your library on this device.',
+  'detail.delete': 'Delete',
+
   'calendar.title': 'Calendar',
   'calendar.subtitle': 'Events detected in your screenshots',
   'calendar.empty': 'No events yet',

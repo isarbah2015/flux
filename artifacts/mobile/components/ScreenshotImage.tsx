@@ -22,8 +22,13 @@ interface Props {
   iconSize?: number;
 }
 
-function useContentUriLoader(uri: string | null): boolean {
-  return Platform.OS === 'android' && !!uri?.startsWith('content://');
+function useAndroidNativeLoader(uri: string | null): boolean {
+  if (Platform.OS !== 'android' || !uri) return false;
+  return (
+    uri.startsWith('content://') ||
+    uri.startsWith('file://') ||
+    uri.startsWith('/')
+  );
 }
 
 export default function ScreenshotImage({
@@ -37,7 +42,7 @@ export default function ScreenshotImage({
 }: Props) {
   const [uri, setUri] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const useNativeLoader = useContentUriLoader(uri);
+  const useNativeLoader = useAndroidNativeLoader(uri);
 
   useEffect(() => {
     let cancelled = false;

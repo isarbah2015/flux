@@ -1,7 +1,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from '@/constants/colors';
+import { useLocale } from '@/context/LocaleContext';
+import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/colors';
+import { translateCategory } from '@/lib/i18n';
 import type { Screenshot } from '@/context/ScreenshotsContext';
 import ScreenshotImage from '@/components/ScreenshotImage';
 import { Feather } from '@expo/vector-icons';
@@ -23,9 +25,10 @@ function timeAgo(iso: string): string {
 
 export default function ScreenshotCard({ item }: Props) {
   const colors = useColors();
+  const { locale } = useLocale();
   const catColor = CATEGORY_COLORS[item.category] ?? '#636384';
   const catIcon = CATEGORY_ICONS[item.category] ?? 'image';
-  const catLabel = CATEGORY_LABELS[item.category] ?? 'Other';
+  const catLabel = translateCategory(locale, item.category);
   const hasInsight = !!(item.priceTracking?.priceDropped || item.promise || item.calendarEvent);
 
   return (

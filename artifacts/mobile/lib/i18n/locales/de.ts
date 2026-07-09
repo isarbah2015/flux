@@ -66,6 +66,16 @@ export const de: Record<I18nKey, string> = {
   'insights.emptySub': 'Preissenkungen, Versprechen und Termine erscheinen hier automatisch.',
   'insights.emptySubNoIndex': 'Erteile Fotozugriff, um mit der Indexierung zu beginnen.',
 
+  'insights.section.price_drop': 'Preissenkungen',
+  'insights.section.price_watch': 'Beobachtung',
+  'insights.section.promise': 'Versprechen',
+  'insights.section.calendar': 'Bevorstehend',
+
+  'detail.notFound': 'Nicht gefunden',
+  'detail.deleteTitle': 'Screenshot löschen?',
+  'detail.deleteBody': 'Er wird aus deiner Bibliothek auf diesem Gerät entfernt.',
+  'detail.delete': 'Löschen',
+
   'calendar.title': 'Kalender',
   'calendar.subtitle': 'In deinen Screenshots erkannte Termine',
   'calendar.empty': 'Noch keine Termine',

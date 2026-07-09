@@ -66,6 +66,16 @@ export const sw: Record<I18nKey, string> = {
   'insights.emptySub': 'Kupungua kwa bei, ahadi na matukio yanaonekana hapa kiotomatiki.',
   'insights.emptySubNoIndex': 'Ruhusu ufikiaji wa picha kuanza kuorodhesha.',
 
+  'insights.section.price_drop': 'Kupungua kwa bei',
+  'insights.section.price_watch': 'Ufuatiliaji',
+  'insights.section.promise': 'Ahadi',
+  'insights.section.calendar': 'Ijayo',
+
+  'detail.notFound': 'Haipatikani',
+  'detail.deleteTitle': 'Futa picha ya skrini?',
+  'detail.deleteBody': 'Itaondolewa kwenye maktaba kwenye kifaa hiki.',
+  'detail.delete': 'Futa',
+
   'calendar.title': 'Kalenda',
   'calendar.subtitle': 'Matukio yaliyogunduliwa katika picha zako za skrini',
   'calendar.empty': 'Bado hakuna matukio',

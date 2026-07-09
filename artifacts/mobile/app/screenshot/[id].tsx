@@ -12,8 +12,10 @@ import * as Clipboard from 'expo-clipboard';
 import { useColors } from '@/hooks/useColors';
 import { useScreenInsets } from '@/hooks/useScreenInsets';
 import { usePremiumGate } from '@/hooks/usePremiumGate';
+import { useLocale } from '@/context/LocaleContext';
+import { translateCategory } from '@/lib/i18n';
 import { useScreenshots } from '@/context/ScreenshotsContext';
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from '@/constants/colors';
+import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/constants/colors';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -38,6 +40,7 @@ export default function ScreenshotDetail() {
   const { topPad, bottomPad } = useScreenInsets({ tabBar: false });
   const { getScreenshot, deleteScreenshot } = useScreenshots();
   const { requirePremium } = usePremiumGate();
+  const { t, locale } = useLocale();
   const screenshot = getScreenshot(id ?? '');
 
   const copyText = useCallback(async () => {
@@ -49,13 +52,10 @@ export default function ScreenshotDetail() {
 
   const confirmDelete = useCallback(() => {
     if (!screenshot) return;
-    Alert.alert(
-      'Delete screenshot?',
-      'This removes it from your library on this device.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('detail.deleteTitle'), t('detail.deleteBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('detail.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
@@ -76,7 +76,7 @@ export default function ScreenshotDetail() {
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
         <View style={styles.centered}>
-          <Text style={[styles.notFound, { color: colors.mutedForeground }]}>Not found</Text>
+          <Text style={[styles.notFound, { color: colors.mutedForeground }]}>{t('detail.notFound')}</Text>
         </View>
       </View>
     );
@@ -84,7 +84,7 @@ export default function ScreenshotDetail() {
 
   const catColor = CATEGORY_COLORS[screenshot.category] ?? '#636384';
   const catIcon = CATEGORY_ICONS[screenshot.category] ?? 'image';
-  const catLabel = CATEGORY_LABELS[screenshot.category] ?? 'Other';
+  const catLabel = translateCategory(locale, screenshot.category);
   const hasText = !!screenshot.extractedText?.trim();
   const wordCount = hasText
     ? screenshot.extractedText.trim().split(/\s+/).filter(Boolean).length

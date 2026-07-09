@@ -66,6 +66,16 @@ export const zh: Record<I18nKey, string> = {
   'insights.emptySub': '降价、承诺和事件会自动显示在这里。',
   'insights.emptySubNoIndex': '授予照片访问权限以开始索引。',
 
+  'insights.section.price_drop': '降价',
+  'insights.section.price_watch': '关注中',
+  'insights.section.promise': '承诺',
+  'insights.section.calendar': '即将到来',
+
+  'detail.notFound': '未找到',
+  'detail.deleteTitle': '删除截图？',
+  'detail.deleteBody': '将从本设备的库中移除。',
+  'detail.delete': '删除',
+
   'calendar.title': '日历',
   'calendar.subtitle': '从截图中检测到的事件',
   'calendar.empty': '暂无事件',

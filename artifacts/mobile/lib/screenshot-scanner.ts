@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Asset, Album, AssetsOptions, GranularPermission } from 'expo-media-library';
 import { readImageBase64, materializeImageToCache } from '@/lib/image-materialize';
+import { isoFromMediaCreationTime, mediaCreationTimeMs } from '@/lib/media-time';
 
 type MediaLibraryModule = typeof import('expo-media-library');
 
@@ -174,7 +175,52 @@ async function loadAllScreenshotCandidates(): Promise<Asset[]> {
   return recent.filter((asset) => isScreenshotFilename(asset.filename));
 }
 
-const CAPTURE_TIME_TOLERANCE_MS = 8_000;
+const CAPTURE_TIME_TOLERANCE_MS = 60_000;
+
+/** All screenshot assets on device (requires photo permission). */
+export async function loadGalleryScreenshotAssets(): Promise<Asset[]> {
+  const permission = await requestScreenshotLibraryAccess();
+  if (permission === 'denied' || permission === 'unavailable') return [];
+  return loadAllScreenshotCandidates();
+}
+
+function captureTimeCandidatesMs(capturedAtIso: string): number[] {
+  const primary = new Date(capturedAtIso).getTime();
+  if (!Number.isFinite(primary)) return [];
+
+  const candidates = new Set<number>([primary]);
+  // Rows indexed before the seconds→ms fix stored ~1970 dates (seconds treated as ms).
+  if (primary < 86_400_000 * 400) {
+    candidates.add(primary * 1000);
+  }
+  return [...candidates];
+}
+
+export function matchGalleryAssetFromList(
+  capturedAtIso: string,
+  assets: Asset[],
+  usedAssetIds: ReadonlySet<string>,
+): Asset | null {
+  const targets = captureTimeCandidatesMs(capturedAtIso);
+  if (targets.length === 0) return null;
+
+  let best: Asset | null = null;
+  let bestDelta = Infinity;
+
+  for (const asset of assets) {
+    if (usedAssetIds.has(asset.id)) continue;
+    const assetMs = mediaCreationTimeMs(asset.creationTime);
+    for (const targetMs of targets) {
+      const delta = Math.abs(assetMs - targetMs);
+      if (delta <= CAPTURE_TIME_TOLERANCE_MS && delta < bestDelta) {
+        best = asset;
+        bestDelta = delta;
+      }
+    }
+  }
+
+  return best;
+}
 
 /**
  * Match a gallery screenshot to a local row by capture time (for rows missing localAssetId).
@@ -183,26 +229,8 @@ export async function matchGalleryAssetForTimestamp(
   capturedAtIso: string,
   usedAssetIds: ReadonlySet<string>,
 ): Promise<Asset | null> {
-  const permission = await requestScreenshotLibraryAccess();
-  if (permission === 'denied' || permission === 'unavailable') return null;
-
-  const targetMs = new Date(capturedAtIso).getTime();
-  if (!Number.isFinite(targetMs)) return null;
-
-  const candidates = await loadAllScreenshotCandidates();
-  let best: Asset | null = null;
-  let bestDelta = Infinity;
-
-  for (const asset of candidates) {
-    if (usedAssetIds.has(asset.id)) continue;
-    const delta = Math.abs(asset.creationTime - targetMs);
-    if (delta <= CAPTURE_TIME_TOLERANCE_MS && delta < bestDelta) {
-      best = asset;
-      bestDelta = delta;
-    }
-  }
-
-  return best;
+  const assets = await loadGalleryScreenshotAssets();
+  return matchGalleryAssetFromList(capturedAtIso, assets, usedAssetIds);
 }
 
 /** List screenshot assets on device that Flux has not indexed yet. */

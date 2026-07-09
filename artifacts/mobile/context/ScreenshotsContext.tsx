@@ -47,7 +47,7 @@ import { initFluxNotifications, reschedulePromiseReminders } from '@/lib/notific
 import { isOcrNativeLinked } from '@/lib/ocr-service';
 import { buildFluxDashboard } from '@/lib/app-analytics';
 import { scheduleWeeklyDigest } from '@/lib/weekly-digest';
-import { deleteScreenshotOnApi } from '@/lib/screenshot-api';
+import { isoFromMediaCreationTime } from '@/lib/media-time';
 import type { LocalScreenshotRow } from '@/lib/local-db';
 
 import type { Category } from '@/constants/categories';
@@ -464,7 +464,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
               imageUri: prepared.imageUri,
               localAssetId: asset.id,
               filename: prepared.filename,
-              capturedAt: new Date(prepared.creationTime).toISOString(),
+              capturedAt: isoFromMediaCreationTime(prepared.creationTime),
             });
             const shot = localRowToScreenshot(row);
             setLocalScreenshots((prev) => [shot, ...prev.filter((s) => s.id !== shot.id)]);

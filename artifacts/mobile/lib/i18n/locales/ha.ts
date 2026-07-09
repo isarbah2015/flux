@@ -66,6 +66,16 @@ export const ha: Record<I18nKey, string> = {
   'insights.emptySub': 'Raguwar farashi, alƙawura da abubuwan da suka faru suna bayyana a nan ta atomatik.',
   'insights.emptySubNoIndex': 'Ba da damar shiga hotuna don fara jera.',
 
+  'insights.section.price_drop': 'Raguwar farashi',
+  'insights.section.price_watch': 'Sa ido',
+  'insights.section.promise': 'Alƙawura',
+  'insights.section.calendar': 'Masu zuwa',
+
+  'detail.notFound': 'Ba a samu ba',
+  'detail.deleteTitle': 'Share hoton allo?',
+  'detail.deleteBody': 'Za a cire shi daga ɗakin karatu a wannan na\'urar.',
+  'detail.delete': 'Share',
+
   'calendar.title': 'Kalanda',
   'calendar.subtitle': 'Abubuwan da aka gano a cikin hotunan allonka',
   'calendar.empty': 'Babu abubuwan da suka faru tukuna',

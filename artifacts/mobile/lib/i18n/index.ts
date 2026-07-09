@@ -8,11 +8,12 @@ import { hi } from './locales/hi';
 import { pt } from './locales/pt';
 import { sw } from './locales/sw';
 import { ha } from './locales/ha';
+import { ru } from './locales/ru';
 
 export type { I18nKey };
 
 /** Languages with a complete UI translation pack. */
-export const FULL_LOCALE_CODES = ['en', 'fr', 'es', 'de', 'ar', 'zh', 'hi', 'pt', 'sw', 'ha'] as const;
+export const FULL_LOCALE_CODES = ['en', 'fr', 'es', 'de', 'ar', 'zh', 'hi', 'pt', 'sw', 'ha', 'ru'] as const;
 
 const PACKS: Record<string, Partial<Record<I18nKey, string>>> = {
   en,
@@ -25,6 +26,7 @@ const PACKS: Record<string, Partial<Record<I18nKey, string>>> = {
   pt,
   sw,
   ha,
+  ru,
 };
 
 export function localeHasFullPack(locale: string): boolean {

@@ -66,6 +66,16 @@ export const pt: Record<I18nKey, string> = {
   'insights.emptySub': 'Quedas de preço, promessas e eventos aparecem aqui automaticamente.',
   'insights.emptySubNoIndex': 'Conceda acesso às fotos para começar a indexar.',
 
+  'insights.section.price_drop': 'Quedas de preço',
+  'insights.section.price_watch': 'Monitorização',
+  'insights.section.promise': 'Promessas',
+  'insights.section.calendar': 'Próximos',
+
+  'detail.notFound': 'Não encontrado',
+  'detail.deleteTitle': 'Eliminar captura?',
+  'detail.deleteBody': 'Será removida da sua biblioteca neste dispositivo.',
+  'detail.delete': 'Eliminar',
+
   'calendar.title': 'Calendário',
   'calendar.subtitle': 'Eventos detetados nas suas capturas',
   'calendar.empty': 'Ainda sem eventos',

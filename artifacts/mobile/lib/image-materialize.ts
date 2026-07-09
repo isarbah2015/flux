@@ -21,6 +21,7 @@ function normalizeUri(uri: string): string {
 }
 
 async function ensureImageDir(): Promise<void> {
+  if (!documentDirectory) return;
   await makeDirectoryAsync(IMAGE_DIR, { intermediates: true }).catch(() => undefined);
 }
 
@@ -66,6 +67,8 @@ export async function materializeImageToCache(
   base64?: string | null,
   screenshotId?: string | null,
 ): Promise<string | null> {
+  if (!documentDirectory) return uri ? normalizeUri(uri) : null;
+
   await ensureImageDir();
   const target = persistentImagePath(screenshotId);
 
@@ -86,14 +89,15 @@ export async function materializeImageToCache(
   const clean = uri ? normalizeUri(uri) : null;
   if (!clean) return null;
 
+  if (screenshotId) {
+    const copied = await copyToPersistentFile(clean, target);
+    if (copied) return copied;
+  }
+
   if (clean.startsWith('file://') || (Platform.OS === 'ios' && clean.startsWith('/'))) {
     const fileUri = clean.startsWith('/') ? `file://${clean}` : clean;
     if (await fileUriExists(fileUri)) return fileUri;
-    if (screenshotId) {
-      const copied = await copyToPersistentFile(fileUri, target);
-      if (copied) return copied;
-    }
-    return fileUri;
+    return null;
   }
 
   if (
@@ -102,10 +106,6 @@ export async function materializeImageToCache(
     clean.startsWith('http://') ||
     clean.startsWith('https://')
   ) {
-    if (screenshotId) {
-      const copied = await copyToPersistentFile(clean, target);
-      if (copied) return copied;
-    }
     return clean.startsWith('content://') || clean.startsWith('ph://') ? clean : null;
   }
 
@@ -119,7 +119,7 @@ export async function readImageBase64(
 ): Promise<string | null> {
   if (base64?.trim()) return base64;
 
-  const materialized = await materializeImageToCache(uri);
+  const materialized = await materializeImageToCache(uri, null, uri ? `read-${Date.now()}` : null);
   if (!materialized) return null;
 
   const readUri =

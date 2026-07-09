@@ -11,7 +11,8 @@ import { fileUriExists, materializeImageToCache } from '@/lib/image-materialize'
 import { isPremiumCached } from '@/lib/premium-cache';
 import { reconcilePriceTracking } from '@/lib/price-watch';
 import {
-  matchGalleryAssetForTimestamp,
+  matchGalleryAssetFromList,
+  loadGalleryScreenshotAssets,
   requestScreenshotLibraryAccess,
 } from '@/lib/screenshot-scanner';
 import { readImageBase64FromUri, resolveScreenshotDisplayUri, assetStorageId } from '@/lib/screenshot-uri';
@@ -164,6 +165,7 @@ export async function repairLocalScreenshotImages(): Promise<number> {
   await requestScreenshotLibraryAccess().catch(() => undefined);
 
   const rows = await getAllLocalScreenshotRows();
+  const galleryAssets = await loadGalleryScreenshotAssets();
   const usedAssetIds = new Set<string>();
   let repaired = 0;
 
@@ -172,15 +174,16 @@ export async function repairLocalScreenshotImages(): Promise<number> {
 
     const stableExisting = await materializeImageToCache(null, null, row.id);
     if (stableExisting && (await fileUriExists(stableExisting))) {
-      if (row.imageUri === stableExisting) continue;
+      if (row.imageUri === stableExisting && row.localAssetId) continue;
+      if (row.imageUri === stableExisting && !row.localAssetId && galleryAssets.length === 0) continue;
       await insertLocalScreenshot({ ...row, imageUri: stableExisting });
       repaired += 1;
       continue;
     }
 
     let localAssetId = row.localAssetId;
-    if (!localAssetId) {
-      const matched = await matchGalleryAssetForTimestamp(row.capturedAt, usedAssetIds);
+    if (!localAssetId && galleryAssets.length > 0) {
+      const matched = matchGalleryAssetFromList(row.capturedAt, galleryAssets, usedAssetIds);
       if (matched) {
         localAssetId = matched.id;
         usedAssetIds.add(matched.id);
@@ -197,7 +200,7 @@ export async function repairLocalScreenshotImages(): Promise<number> {
     const unchanged =
       stableUri === row.imageUri &&
       localAssetId === row.localAssetId &&
-      (await fileUriExists(stableUri));
+      (stableUri.startsWith('content://') || (await fileUriExists(stableUri)));
     if (unchanged) continue;
 
     await insertLocalScreenshot({

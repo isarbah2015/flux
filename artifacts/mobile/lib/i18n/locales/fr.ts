@@ -66,6 +66,16 @@ export const fr: Record<I18nKey, string> = {
   'insights.emptySub': 'Les baisses de prix, promesses et événements apparaissent ici automatiquement.',
   'insights.emptySubNoIndex': 'Accordez l\'accès aux photos pour commencer l\'indexation.',
 
+  'insights.section.price_drop': 'Baisses de prix',
+  'insights.section.price_watch': 'Surveillance',
+  'insights.section.promise': 'Promesses',
+  'insights.section.calendar': 'À venir',
+
+  'detail.notFound': 'Introuvable',
+  'detail.deleteTitle': 'Supprimer la capture ?',
+  'detail.deleteBody': 'Elle sera retirée de votre bibliothèque sur cet appareil.',
+  'detail.delete': 'Supprimer',
+
   'calendar.title': 'Calendrier',
   'calendar.subtitle': 'Événements détectés dans vos captures',
   'calendar.empty': 'Pas encore d\'événements',
