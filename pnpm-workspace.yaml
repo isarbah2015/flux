@@ -160,4 +160,9 @@ overrides:
   esbuild: "0.27.3"
 
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
+  '@swc/core': true
+  protobufjs: true
+  '@firebase/util': true
+  msw: true
+  unrs-resolver: true
