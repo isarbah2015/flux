@@ -47,6 +47,7 @@ export default function ScreenshotCard({ item }: Props) {
         <ScreenshotImage
           imageUri={item.imageUri}
           localAssetId={item.localAssetId}
+          screenshotId={item.id}
           fallbackColor={catColor}
           style={styles.thumbnail}
           iconSize={24}

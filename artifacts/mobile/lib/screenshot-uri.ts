@@ -1,4 +1,5 @@
-import { materializeImageToCache, readImageBase64 } from '@/lib/image-materialize';
+import { Platform } from 'react-native';
+import { fileUriExists, materializeImageToCache, readImageBase64 } from '@/lib/image-materialize';
 
 type MediaLibraryModule = typeof import('expo-media-library');
 
@@ -36,23 +37,42 @@ export async function resolveAssetDisplayUri(localAssetId: string): Promise<stri
 export async function resolveScreenshotDisplayUri(
   imageUri: string | null | undefined,
   localAssetId?: string | null,
+  screenshotId?: string | null,
 ): Promise<string | null> {
   const direct = imageUri?.split('#')[0];
-  if (direct && direct.startsWith('file://')) {
+
+  if (direct && (await fileUriExists(direct))) {
     return direct;
   }
 
   if (localAssetId) {
     const fromAsset = await resolveAssetDisplayUri(localAssetId);
-    if (fromAsset) return fromAsset;
+    if (fromAsset) {
+      const materialized = await materializeImageToCache(fromAsset, null, screenshotId);
+      if (materialized) return materialized;
+      if (await fileUriExists(fromAsset)) return fromAsset;
+    }
   }
 
-  if (direct && !direct.startsWith('ph://')) {
-    const materialized = await materializeImageToCache(direct);
-    return materialized ?? direct;
+  if (direct) {
+    const materialized = await materializeImageToCache(direct, null, screenshotId);
+    if (materialized) return materialized;
+
+    if (
+      Platform.OS === 'android' &&
+      direct.startsWith('content://') &&
+      localAssetId
+    ) {
+      const fromAsset = await resolveAssetDisplayUri(localAssetId);
+      if (fromAsset) {
+        return materializeImageToCache(fromAsset, null, screenshotId);
+      }
+    }
+
+    if (!direct.startsWith('ph://')) return direct;
   }
 
-  return direct ?? null;
+  return null;
 }
 
 /** Read image bytes as base64 for server OCR (skips huge reads). */

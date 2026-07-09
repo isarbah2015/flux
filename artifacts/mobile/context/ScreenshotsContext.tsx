@@ -39,6 +39,7 @@ import {
   localRowToScreenshot,
   processScreenshotOnDevice,
   reprocessLocalScreenshotOcr,
+  repairLocalScreenshotImages,
 } from '@/lib/screenshot-pipeline';
 import { readImageBase64FromUri } from '@/lib/screenshot-uri';
 import { runPriceWatchScan } from '@/lib/background-price-watch';
@@ -206,6 +207,7 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
       void (async () => {
         try {
           await initLocalDb();
+          await repairLocalScreenshotImages();
           const rows = await getAllLocalScreenshots();
           setLocalScreenshots(rows);
         } catch (err) {

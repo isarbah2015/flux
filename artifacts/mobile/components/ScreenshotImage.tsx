@@ -8,6 +8,7 @@ import { resolveScreenshotDisplayUri } from '@/lib/screenshot-uri';
 interface Props {
   imageUri?: string | null;
   localAssetId?: string | null;
+  screenshotId?: string | null;
   fallbackColor?: string;
   style?: StyleProp<ViewStyle>;
   contentFit?: 'cover' | 'contain';
@@ -17,6 +18,7 @@ interface Props {
 export default function ScreenshotImage({
   imageUri,
   localAssetId,
+  screenshotId,
   fallbackColor = '#636384',
   style,
   contentFit = 'cover',
@@ -30,14 +32,14 @@ export default function ScreenshotImage({
     setFailed(false);
 
     void (async () => {
-      const resolved = await resolveScreenshotDisplayUri(imageUri, localAssetId);
+      const resolved = await resolveScreenshotDisplayUri(imageUri, localAssetId, screenshotId);
       if (!cancelled) setUri(resolved);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [imageUri, localAssetId]);
+  }, [imageUri, localAssetId, screenshotId]);
 
   const showImage = !!uri && !failed;
 

@@ -145,6 +145,7 @@ export default function ScreenshotDetail() {
           <ScreenshotImage
             imageUri={screenshot.imageUri}
             localAssetId={screenshot.localAssetId}
+            screenshotId={screenshot.id}
             fallbackColor={catColor}
             style={styles.heroImage}
             contentFit="contain"

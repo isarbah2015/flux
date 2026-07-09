@@ -33,8 +33,9 @@ export async function processScreenshotOnDevice(
   }
 
   let imageUri = input.imageUri ?? null;
+  const rowId = newScreenshotId();
   if (imageUri || input.imageBase64) {
-    const materialized = await materializeImageToCache(imageUri, input.imageBase64);
+    const materialized = await materializeImageToCache(imageUri, input.imageBase64, rowId);
     if (materialized) imageUri = materialized;
   }
 
@@ -50,7 +51,7 @@ export async function processScreenshotOnDevice(
   });
 
   let row: LocalScreenshotRow = {
-    id: newScreenshotId(),
+    id: rowId,
     localAssetId: input.localAssetId ?? null,
     imageUri,
     capturedAt: input.capturedAt ?? new Date().toISOString(),
@@ -88,7 +89,7 @@ export async function reprocessLocalScreenshotOcr(
 ): Promise<LocalScreenshotRow | null> {
   if (row.extractedText.trim()) return row;
 
-  const displayUri = await resolveScreenshotDisplayUri(row.imageUri, row.localAssetId);
+  const displayUri = await resolveScreenshotDisplayUri(row.imageUri, row.localAssetId, row.id);
   if (!displayUri) return row;
 
   const base64 = await readImageBase64FromUri(displayUri);
@@ -139,4 +140,20 @@ export function localRowToScreenshot(row: LocalScreenshotRow) {
     promise: row.metadata.promise,
     calendarEvent: row.metadata.calendarEvent,
   };
+}
+
+/** Re-materialize missing/stale image files from gallery asset ids (e.g. after cache clear). */
+export async function repairLocalScreenshotImages(): Promise<number> {
+  const rows = await getAllLocalScreenshotRows();
+  let repaired = 0;
+
+  for (const row of rows) {
+    const displayUri = await resolveScreenshotDisplayUri(row.imageUri, row.localAssetId, row.id);
+    if (!displayUri || displayUri === row.imageUri) continue;
+
+    await insertLocalScreenshot({ ...row, imageUri: displayUri });
+    repaired += 1;
+  }
+
+  return repaired;
 }
