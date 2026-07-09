@@ -59,24 +59,25 @@ async function initSchema(db: SQLiteTypes.SQLiteDatabase): Promise<void> {
     );
   `);
 
-  try {
-    if (!ENABLE_FTS5) throw new Error('FTS disabled');
-    await db.execAsync(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS screenshots_fts USING fts5(
-        screenshot_id UNINDEXED,
-        extracted_text,
-        summary,
-        tags,
-        category,
-        tokenize='porter unicode61'
-      );
-    `);
-    ftsEnabled = true;
-  } catch {
-    ftsEnabled = false;
-    if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.warn('[Flux DB] FTS5 unavailable — using LIKE search fallback.');
+  if (ENABLE_FTS5) {
+    try {
+      await db.execAsync(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS screenshots_fts USING fts5(
+          screenshot_id UNINDEXED,
+          extracted_text,
+          summary,
+          tags,
+          category,
+          tokenize='porter unicode61'
+        );
+      `);
+      ftsEnabled = true;
+    } catch {
+      ftsEnabled = false;
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn('[Flux DB] FTS5 unavailable — using LIKE search fallback.');
+      }
     }
   }
 }

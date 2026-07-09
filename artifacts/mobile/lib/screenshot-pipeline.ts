@@ -7,10 +7,10 @@ import {
 } from '@/lib/local-db';
 import { notifyPriceDrop, schedulePromiseReminder } from '@/lib/notifications';
 import { ocrFromImageUri } from '@/lib/ocr-service';
-import { materializeImageToCache } from '@/lib/image-materialize';
+import { fileUriExists, materializeImageToCache } from '@/lib/image-materialize';
 import { isPremiumCached } from '@/lib/premium-cache';
 import { reconcilePriceTracking } from '@/lib/price-watch';
-import { readImageBase64FromUri, resolveScreenshotDisplayUri } from '@/lib/screenshot-uri';
+import { readImageBase64FromUri, resolveScreenshotDisplayUri, assetStorageId } from '@/lib/screenshot-uri';
 
 export interface ProcessScreenshotInput {
   imageUri?: string | null;
@@ -148,8 +148,14 @@ export async function repairLocalScreenshotImages(): Promise<number> {
   let repaired = 0;
 
   for (const row of rows) {
-    const displayUri = await resolveScreenshotDisplayUri(row.imageUri, row.localAssetId, row.id);
-    if (!displayUri || displayUri === row.imageUri) continue;
+    const storageId = row.localAssetId ? assetStorageId(row.localAssetId) : row.id;
+    const displayUri = await resolveScreenshotDisplayUri(
+      row.imageUri,
+      row.localAssetId,
+      storageId,
+    );
+    if (!displayUri) continue;
+    if (displayUri === row.imageUri && (await fileUriExists(displayUri))) continue;
 
     await insertLocalScreenshot({ ...row, imageUri: displayUri });
     repaired += 1;

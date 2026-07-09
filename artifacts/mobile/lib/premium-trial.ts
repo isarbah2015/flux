@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getReferralBonusDays, effectiveTrialDays } from '@/lib/referral';
+import { PREMIUM_TRIAL_DAYS, effectiveTrialDays } from '@/lib/trial-constants';
+import { getReferralBonusDays } from '@/lib/referral';
+
+export { PREMIUM_TRIAL_DAYS } from '@/lib/trial-constants';
 
 const TRIAL_STARTED_KEY = 'flux_trial_started_at';
-
-/** Days of full Premium access for new installs before paywall. */
-export const PREMIUM_TRIAL_DAYS = 14;
 
 export async function getEffectiveTrialDays(): Promise<number> {
   const bonus = await getReferralBonusDays();

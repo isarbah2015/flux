@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PREMIUM_TRIAL_DAYS } from '@/lib/premium-trial';
 
 const REFERRAL_BONUS_KEY = 'flux_referral_bonus_days';
 const REFERRAL_CODE_KEY = 'flux_referral_redeemed';
@@ -33,8 +32,4 @@ export async function redeemReferralCode(code: string): Promise<{ ok: boolean; m
     message: `+${bonus} bonus trial days added`,
     bonusDays: bonus,
   };
-}
-
-export function effectiveTrialDays(baseDays = PREMIUM_TRIAL_DAYS, bonusDays = 0): number {
-  return baseDays + bonusDays;
 }

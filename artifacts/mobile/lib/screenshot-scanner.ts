@@ -254,7 +254,11 @@ export async function prepareScreenshotAsset(asset: Asset): Promise<PreparedScre
   if (!uri) return null;
 
   try {
-    const readableUri = (await materializeImageToCache(uri)) ?? uri;
+    const readableUri = (await materializeImageToCache(
+      uri,
+      null,
+      `asset-${asset.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+    )) ?? uri;
     return {
       assetId: asset.id,
       filename: asset.filename,

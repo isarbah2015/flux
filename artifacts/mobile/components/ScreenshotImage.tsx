@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Image as RNImage,
+  Platform,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -15,6 +22,10 @@ interface Props {
   iconSize?: number;
 }
 
+function useContentUriLoader(uri: string | null): boolean {
+  return Platform.OS === 'android' && !!uri?.startsWith('content://');
+}
+
 export default function ScreenshotImage({
   imageUri,
   localAssetId,
@@ -26,10 +37,12 @@ export default function ScreenshotImage({
 }: Props) {
   const [uri, setUri] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const useNativeLoader = useContentUriLoader(uri);
 
   useEffect(() => {
     let cancelled = false;
     setFailed(false);
+    setUri(null);
 
     void (async () => {
       const resolved = await resolveScreenshotDisplayUri(imageUri, localAssetId, screenshotId);
@@ -46,13 +59,22 @@ export default function ScreenshotImage({
   return (
     <View style={[styles.wrap, style]}>
       {showImage ? (
-        <Image
-          source={{ uri }}
-          style={StyleSheet.absoluteFill}
-          contentFit={contentFit}
-          transition={200}
-          onError={() => setFailed(true)}
-        />
+        useNativeLoader ? (
+          <RNImage
+            source={{ uri }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={contentFit === 'contain' ? 'contain' : 'cover'}
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <Image
+            source={{ uri }}
+            style={StyleSheet.absoluteFill}
+            contentFit={contentFit}
+            transition={200}
+            onError={() => setFailed(true)}
+          />
+        )
       ) : (
         <LinearGradient
           colors={[fallbackColor + '30', fallbackColor + '10']}

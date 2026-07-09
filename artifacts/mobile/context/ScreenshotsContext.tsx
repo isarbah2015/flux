@@ -332,10 +332,26 @@ export function ScreenshotsProvider({ children }: { children: React.ReactNode })
   }, [canFetch, localReady, syncRowToApi]);
 
   const screenshots = useMemo<Screenshot[]>(() => {
-    const api = (query.data ?? []).map(fromApi);
+    const local = [...localScreenshots];
+    const localKeys = new Set(
+      local.map((s) => `${s.capturedAt}|${s.summary.slice(0, 48)}`),
+    );
+
+    const api = (query.data ?? [])
+      .map(fromApi)
+      .filter((s) => {
+        const key = `${s.capturedAt}|${s.summary.slice(0, 48)}`;
+        if (localKeys.has(key)) return false;
+        // API rows have no on-device image — hide text-only ghosts when local library exists.
+        if (local.length > 0 && !s.localAssetId && !s.imageUri?.startsWith('file://')) {
+          return false;
+        }
+        return true;
+      });
+
     const byId = new Map<string, Screenshot>();
     for (const s of api) byId.set(s.id, s);
-    for (const s of localScreenshots) byId.set(s.id, s);
+    for (const s of local) byId.set(s.id, s);
     return Array.from(byId.values()).sort(
       (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
     );
